@@ -1,8 +1,24 @@
 use crate::{crc::crc32, soc::DebugUart, storage::SettingsStore};
 use littlefs_rust::Error;
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[repr(u8)]
+pub enum DashboardTheme {
+    #[default]
+    Standard,
+    Classic,
+}
+impl DashboardTheme {
+    pub fn toggle(&mut self) {
+        *self = match self {
+            Self::Standard => Self::Classic,
+            Self::Classic => Self::Standard,
+        };
+    }
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Settings {
+    pub theme: DashboardTheme,
     pub brightness: u8,
     pub imperial: bool,
     pub levels: u8,
@@ -15,6 +31,7 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            theme: DashboardTheme::Standard,
             brightness: 3,
             imperial: false,
             levels: 5,
@@ -69,7 +86,8 @@ impl Record {
         };
         let version = record.word(4);
         let flags = record.word(24);
-        let mask = 255
+        let mask = (if version >= 4 { 1 << 12 } else { 0 })
+            | 255
             | if version >= 2 { 1 << 8 } else { 0 }
             | if version >= 3 {
                 (1 << 9) | (3 << 10)
@@ -77,7 +95,7 @@ impl Record {
                 0
             };
         if record.word(0) != 0x46504b45
-            || !(1..=3).contains(&version)
+            || !(1..=4).contains(&version)
             || !(1..=5).contains(&record.word(12))
             || record.word(16) > 1
             || !matches!(record.word(20), 3 | 5 | 9)
@@ -87,7 +105,7 @@ impl Record {
         {
             return None;
         }
-        if version == 3
+        if version >= 3
             && (record.word(32) > 10000
                 || record.word(32) % 500 != 0
                 || record.word(84) != crc32(&record.bytes[..84]))
@@ -108,7 +126,12 @@ impl Record {
             bluetooth: version == 1 || flags & (1 << 8) != 0,
             ..Settings::default()
         };
-        if version == 3 {
+        if version >= 3 {
+            out.settings.theme = if version >= 4 && flags & (1 << 12) != 0 {
+                DashboardTheme::Classic
+            } else {
+                DashboardTheme::Standard
+            };
             out.settings.language = ((flags >> 9) & 1) as u8;
             out.settings.power_mode = ((flags >> 10) & 3) as u8;
             out.settings.service_interval_km = self.word(32);
@@ -126,10 +149,11 @@ impl Record {
         let flags = settings.auto_off_minutes as u32
             | ((settings.bluetooth as u32) << 8)
             | ((settings.language as u32) << 9)
-            | ((settings.power_mode as u32) << 10);
+            | ((settings.power_mode as u32) << 10)
+            | ((settings.theme as u32) << 12);
         for (offset, value) in [
             (0, 0x46504b45),
-            (4, 3),
+            (4, 4),
             (8, sequence),
             (12, settings.brightness as u32),
             (16, settings.imperial as u32),
@@ -160,7 +184,7 @@ pub struct SettingsManager {
     sequence: u32,
     last: Option<Preferences>,
     file_source: bool,
-    last_v3: bool,
+    last_current: bool,
     slot: usize,
 }
 impl SettingsManager {
@@ -170,7 +194,7 @@ impl SettingsManager {
             sequence: 0,
             last: None,
             file_source: false,
-            last_v3: false,
+            last_current: false,
             slot: 0,
         }
     }
@@ -179,7 +203,7 @@ impl SettingsManager {
     }
     pub fn load(&mut self) -> Preferences {
         self.file_source = false;
-        self.last_v3 = false;
+        self.last_current = false;
         self.last = None;
         self.sequence = 0;
         self.slot = 0;
@@ -197,7 +221,7 @@ impl SettingsManager {
                         .as_ref()
                         .is_none_or(|old| Self::newer(record.word(8), old.word(8)))
                     {
-                        self.last_v3 = record.word(4) == 3;
+                        self.last_current = record.word(4) == 4;
                         newest = Some(record);
                         self.slot = slot;
                         self.file_source = true;
@@ -235,7 +259,7 @@ impl SettingsManager {
         }
     }
     pub fn save(&mut self, preferences: &Preferences) -> Result<SaveResult, Error> {
-        if self.file_source && self.last_v3 && self.last.as_ref() == Some(preferences) {
+        if self.file_source && self.last_current && self.last.as_ref() == Some(preferences) {
             return Ok(SaveResult::Unchanged);
         }
         let record = Record::encode(preferences, self.sequence.wrapping_add(1));
@@ -251,7 +275,7 @@ impl SettingsManager {
         self.sequence = record.word(8);
         self.last = Some(*preferences);
         self.file_source = true;
-        self.last_v3 = true;
+        self.last_current = true;
         DebugUart::log("[SETTINGS] SAVE_RESULT=00000000\n");
         Ok(SaveResult::Saved)
     }

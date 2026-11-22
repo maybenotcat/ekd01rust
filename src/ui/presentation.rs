@@ -151,6 +151,10 @@ impl Presenter<'_> {
         let d = &self.model.basic;
         let tr = |key| self.tr(key).to_string();
         match item {
+            Theme => tr(match s.theme {
+                crate::preferences::DashboardTheme::Standard => "Standard",
+                crate::preferences::DashboardTheme::Classic => "Classic",
+            }),
             Brightness => format!(
                 "{}%",
                 [10, 30, 50, 75, 100][s.brightness.saturating_sub(1).min(4) as usize]
@@ -472,6 +476,7 @@ impl UserInterface {
         let t = &bike.telemetry;
         let c = &self.component;
         c.set_view(model.navigation.view as i32);
+        c.set_theme(model.preferences.settings.theme as i32);
         c.set_status_error(model.save_error);
         c.set_status(if model.navigation.view == View::Dashboard {
             "".into()
@@ -492,6 +497,33 @@ impl UserInterface {
                 c.set_assist_caption(p.tr("ASSIST").into());
                 c.set_assist_text(
                     format!("{} / {}", model.assist, model.preferences.settings.levels).into(),
+                );
+                c.set_assist_level(model.assist as i32);
+                let odometer = p.distance(model.preferences.odometer_m);
+                c.set_odometer_text(
+                    format!(
+                        "{}.{:01} {}",
+                        odometer / 1000,
+                        odometer % 1000 / 100,
+                        p.unit()
+                    )
+                    .into(),
+                );
+                c.set_classic_speed_max(
+                    if model.preferences.settings.imperial {
+                        "47"
+                    } else {
+                        "75"
+                    }
+                    .into(),
+                );
+                c.set_classic_speed_mid(
+                    if model.preferences.settings.imperial {
+                        "31"
+                    } else {
+                        "50"
+                    }
+                    .into(),
                 );
                 c.set_voltage(p.voltage().into());
                 c.set_trip_caption(p.tr("TRIP").into());
@@ -532,6 +564,8 @@ impl UserInterface {
                 c.set_error(error.into());
                 if t.electric_fresh(now) {
                     c.set_speed_available(true);
+                    c.set_speed_tenths((p.distance(t.speed as u32) / 10) as i32);
+                    c.set_classic_speed_fill((t.speed as u32 / 75).min(100) as i32);
                     let speed = p.distance(t.speed as u32);
                     let power = t.voltage as i64 * t.current as i64 / 10000;
                     c.set_compact_speed(speed >= 10000);
@@ -567,6 +601,7 @@ impl UserInterface {
                     c.set_power_fill((power.max(0) / 20).min(100) as i32);
                 } else {
                     c.set_speed_available(false);
+                    c.set_classic_speed_fill(0);
                     c.set_speed_integer("--".into());
                     c.set_speed_fraction(".-".into());
                     c.set_speed_digit_count(2);

@@ -1,3 +1,4 @@
+import { ClassicDashboard } from "classic.slint";
 import "../assets/NotoSans-Regular.ttf";
 import "../assets/EKD01Speed.ttf";
 
@@ -21,6 +22,13 @@ export component Dashboard inherits Window {
     // atlas even though the compiler cannot see those Rust string literals.
     in property <string> localization-glyphs: "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя";
     in property <int> view: 0;
+    in property <int> theme: 0;
+    in property <int> speed-tenths;
+    in property <int> classic-speed-fill;
+    in property <string> classic-speed-max: "75";
+    in property <string> classic-speed-mid: "50";
+    in property <int> assist-level;
+    in property <string> odometer-text: "0.0 km";
     in property <string> page-title;
     in property <[Row]> rows;
     in property <string> status;
@@ -51,7 +59,7 @@ export component Dashboard inherits Window {
     in property <string> error;
     in property <bool> fault;
 
-    if root.view == 0: Rectangle {
+    if root.view == 0 && root.theme == 0: Rectangle {
         background: transparent;
         // Noto Sans digits have 0.572em advance. Align both parts to the same
         // baseline; keep the decimal smaller so two full-size digits fit.
@@ -81,6 +89,16 @@ export component Dashboard inherits Window {
             Text { x: 8px; width: 68px; height: parent.height; text: root.voltage; color: white; font-size: 18px; horizontal-alignment: center; vertical-alignment: center; }
         }
         SummaryCard { x: 220px; y: 190px; width: 92px; height: 44px; caption: root.trip-caption; value: root.trip-text; }
+    }
+    if root.view == 0 && root.theme == 1: ClassicDashboard {
+        width: 320px; height: 240px;
+        speed-tenths: root.speed-tenths; speed-available: root.speed-available;
+        speed-fill: root.classic-speed-fill; power-fill: root.power-fill;
+        speed-unit: root.speed-unit; speed-max: root.classic-speed-max; speed-mid: root.classic-speed-mid;
+        power: root.power; battery: root.battery; battery-text: root.battery-text;
+        voltage: root.voltage; assist: root.assist-level; trip: root.trip-text; odometer: root.odometer-text;
+        lights: root.lights; bluetooth: root.bluetooth; error: root.error; fault: root.fault;
+        status: root.status; status-error: root.status-error;
     }
     if root.view != 0: Rectangle {
         background: transparent;

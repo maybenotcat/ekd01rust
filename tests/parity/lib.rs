@@ -290,6 +290,106 @@ mod checks {
         assert_eq!(rebooted.load().settings.language, 1);
     }
     #[test]
+    fn dashboard_theme_menu_save_reboot_and_reset() {
+        use input::ButtonEvents;
+        use preferences::DashboardTheme;
+        use ui::{
+            data::Item,
+            model::{Actions, Page, UiModel, View},
+        };
+        let bus = Rc::new(RefCell::new(soc::flash::Flash::default()));
+        let mut manager = SettingsManager::new(SettingsStore::new(bus.clone()));
+        let mut model = UiModel::new(manager.load());
+        assert_eq!(model.preferences.settings.theme, DashboardTheme::Standard);
+        model.navigation.view = View::Menu;
+        model.enter(Page::Display);
+        model.navigation.selected = (0..model.count())
+            .find(|index| model.item(*index) == Item::Theme)
+            .unwrap();
+        let power = ButtonEvents {
+            short: 4,
+            released: 4,
+            ..Default::default()
+        };
+        model.step(power, 1);
+        assert!(model.navigation.editing);
+        model.step(
+            ButtonEvents {
+                pressed: 1,
+                ..Default::default()
+            },
+            2,
+        );
+        assert_eq!(model.preferences.settings.theme, DashboardTheme::Classic);
+        assert!(model.step(power, 3).contains(Actions::SAVE));
+        manager.save(&model.preferences).unwrap();
+        let mut rebooted = SettingsManager::new(SettingsStore::new(bus.clone()));
+        let mut restored = rebooted.load();
+        assert_eq!(restored.settings.theme, DashboardTheme::Classic);
+        assert_eq!(rebooted.save(&restored).unwrap(), SaveResult::Unchanged);
+        restored.settings.theme.toggle();
+        rebooted.save(&restored).unwrap();
+        assert_eq!(
+            SettingsManager::new(SettingsStore::new(bus))
+                .load()
+                .settings
+                .theme,
+            DashboardTheme::Standard
+        );
+        restored.settings.theme = DashboardTheme::Classic;
+        restored.factory_reset();
+        assert_eq!(restored.settings.theme, DashboardTheme::Standard);
+    }
+
+    #[test]
+    fn dashboard_theme_migrates_v3_without_losing_preferences() {
+        use preferences::DashboardTheme;
+        let bus = Rc::new(RefCell::new(soc::flash::Flash::default()));
+        // Build a pre-theme record independently of the current serializer.
+        let mut bytes = [0u8; 88];
+        for (offset, value) in [
+            (0, 0x46504b45u32),
+            (4, 3),
+            (8, 55),
+            (12, 4),
+            (16, 1),
+            (20, 9),
+            (24, 7 | (1 << 8) | (1 << 9) | (2 << 10)),
+            (32, 1500),
+            (36, 765432),
+            (40, 1234567),
+            (44, 0x21),
+        ] {
+            bytes[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+        }
+        let header_crc = crc::crc32(&bytes[..28]);
+        bytes[28..32].copy_from_slice(&header_crc.to_le_bytes());
+        let full_crc = crc::crc32(&bytes[..84]);
+        bytes[84..88].copy_from_slice(&full_crc.to_le_bytes());
+        SettingsStore::new(bus.clone())
+            .write_verified("/prefs/a", &bytes)
+            .unwrap();
+        let mut manager = SettingsManager::new(SettingsStore::new(bus.clone()));
+        let mut preferences = manager.load();
+        assert_eq!(preferences.settings.theme, DashboardTheme::Standard);
+        assert_eq!(preferences.settings.language, 1);
+        assert_eq!(preferences.settings.brightness, 4);
+        assert_eq!(preferences.settings.power_mode, 2);
+        assert_eq!(preferences.settings.levels, 9);
+        assert_eq!(preferences.settings.auto_off_minutes, 7);
+        assert_eq!(preferences.settings.service_interval_km, 1500);
+        assert_eq!(preferences.odometer_m, 1234567);
+        assert_eq!(preferences.since_service_m, 765432);
+        assert_eq!(preferences.errors[0], 0x21);
+        preferences.settings.theme = DashboardTheme::Classic;
+        manager.save(&preferences).unwrap();
+        assert_eq!(
+            SettingsManager::new(SettingsStore::new(bus)).load(),
+            preferences
+        );
+    }
+
+    #[test]
     fn menu_confirm_exit_and_plus_direction() {
         use input::ButtonEvents;
         use ui::{

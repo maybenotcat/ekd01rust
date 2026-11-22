@@ -65,7 +65,7 @@ impl Page {
         match self {
             Self::Root => &[Display, Motor, Information, Bluetooth, FactoryReset, Exit],
             Self::Display => &[
-                Units, Brightness, AutoOff, Trip, Hour, Minute, Language, Service, Back,
+                Units, Brightness, Theme, AutoOff, Trip, Hour, Minute, Language, Service, Back,
             ],
             Self::Motor => &[
                 Levels,
@@ -278,6 +278,7 @@ impl UiModel {
                 actions |= Actions::BLUETOOTH;
             }
             Language => settings.language ^= 1,
+            Theme => settings.theme.toggle(),
             PowerMode => {
                 settings.power_mode =
                     (settings.power_mode as i32 + 4 + direction).rem_euclid(4) as u8;
@@ -368,6 +369,7 @@ impl UiModel {
                 | Units
                 | Bluetooth
                 | Language
+                | Theme
                 | PowerMode
                 | ServiceInterval
                 | AutoOff
