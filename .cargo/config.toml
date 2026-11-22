@@ -6,6 +6,7 @@ jobs = 2
 # host-tuple is resolved by Cargo on each OS. Rebuild host std as well as core
 # here, since the firmware's global build-std otherwise mixes two core crates.
 xtask = "run --locked --package xtask --target host-tuple -Zbuild-std=std,panic_abort --"
+flasher = "run --locked --package ekd01-flasher --target host-tuple -Zbuild-std=std,panic_abort --"
 
 [env]
 SLINT_FONT_ATLAS_CONFIG = { value = "config/font-atlases.txt", relative = true }

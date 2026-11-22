@@ -1,0 +1,53 @@
+{
+  "source": "Original Varstrom EKD Reprogramming Tool, MTK_AllInOne_DA_v5.1640.00.00",
+  "container_sha256": "13f29c4cab638a023e9c3a8a77292b2f297dad386d12cfbf26acaf9a173ee363",
+  "entry_offset": "000027CC",
+  "entry_index": 45,
+  "entry_stride": 224,
+  "hw_code": "6261",
+  "hw_subcode": "0000",
+  "hw_version": "8000",
+  "sw_version": "CA00",
+  "files": [
+    {
+      "path": "stage1.bin",
+      "region": 2,
+      "container_offset": 5902804,
+      "bytes": 1816,
+      "load_address": "70007000",
+      "content_bytes": 1560,
+      "signature_bytes": 256,
+      "sha256": "efcb02fdce16247e4634d18d4679d26ddd575455d520c8100677943af7642890"
+    },
+    {
+      "path": "stage2.bin",
+      "region": 3,
+      "container_offset": 5904620,
+      "bytes": 124352,
+      "load_address": "10020000",
+      "content_bytes": 124096,
+      "signature_bytes": 256,
+      "sha256": "237c454fa8df876e0d04db94ed5c690016f4de6f09107909b9cb46d4c6fbbce1"
+    },
+    {
+      "path": "nor-table.bin",
+      "region": 4,
+      "container_offset": 6028972,
+      "bytes": 9504,
+      "load_address": "F0000000",
+      "content_bytes": 9504,
+      "signature_bytes": 0,
+      "sha256": "b1ff27591c0844ba4f4d81cec74c9ece26743d608ea8e1f906124de713d3708a"
+    },
+    {
+      "path": "nand-table.bin",
+      "region": 5,
+      "container_offset": 6038476,
+      "bytes": 6136,
+      "load_address": "F1000000",
+      "content_bytes": 6136,
+      "signature_bytes": 0,
+      "sha256": "d82f5cf1fec52c42bd88178aedd9aee6122f251ebe9be7739ea71c67d6b13ffb"
+    }
+  ]
+}
