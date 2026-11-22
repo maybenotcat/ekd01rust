@@ -1,0 +1,10 @@
+/.tools/
+/target/
+/build/
+__pycache__/
+*.pyc
+/docs/
+/tools/
+/vendor/
+/README*
+/*.log

@@ -1,0 +1,104 @@
+import "../assets/NotoSans-Regular.ttf";
+import "../assets/EKD01Speed.ttf";
+
+export struct Row { label: string, value: string, active: bool }
+
+component SummaryCard inherits Rectangle {
+    in property <string> caption;
+    in property <string> value;
+    background: #1c2939;
+    border-radius: 6px;
+    Text { x: 8px; y: 4px; width: parent.width - 16px; height: 18px; text: root.caption; color: white; font-size: 14px; horizontal-alignment: center; }
+    Text { x: 8px; y: 22px; width: parent.width - 16px; height: 20px; text: root.value; color: white; font-size: 18px; horizontal-alignment: center; }
+}
+
+export component Dashboard inherits Window {
+    width: 320px;
+    height: 240px;
+    background: #0b1220;
+    default-font-family: "Noto Sans";
+    // Runtime translations live in Rust. Retain their glyphs in the no_std font
+    // atlas even though the compiler cannot see those Rust string literals.
+    in property <string> localization-glyphs: "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя";
+    in property <int> view: 0;
+    in property <string> page-title;
+    in property <[Row]> rows;
+    in property <string> status;
+    in property <string> info-body;
+    in property <bool> status-error;
+    in property <string> speed-integer: "--";
+    in property <bool> speed-available;
+    in property <string> speed-fraction: ".-";
+    in property <int> speed-digit-count: 2;
+    property <length> speed-main-font: root.compact-speed ? 104px : 150px;
+    property <length> speed-main-width: root.speed-main-font * 0.572 * root.speed-digit-count;
+    property <length> speed-group-x: 4px + (232px - root.speed-main-width - 49px) / 2;
+    in property <string> speed-unit: "km/h";
+    in property <bool> compact-speed;
+    in property <int> speed-fill;
+    in property <string> power: "-- W";
+    in property <int> power-fill;
+    in property <string> voltage: "--.- V";
+    in property <string> battery-text: "--%";
+    in property <int> battery;
+    in property <string> assist-text: "0 / 5";
+    in property <string> assist-caption: "ASSIST";
+    in property <string> trip-text: "0.00 km";
+    in property <string> trip-caption: "TRIP";
+    in property <bool> lights;
+    in property <string> lights-text: "LIGHT";
+    in property <int> bluetooth;
+    in property <string> error;
+    in property <bool> fault;
+
+    if root.view == 0: Rectangle {
+        background: transparent;
+        // Noto Sans digits have 0.572em advance. Align both parts to the same
+        // baseline; keep the decimal smaller so two full-size digits fit.
+        if root.speed-available: Text { x: root.speed-group-x; y: 47px - root.speed-main-font * 0.388; width: root.speed-main-width; height: 130px; text: root.speed-integer; color: white; font-family: "EKD01 Speed"; font-size: root.speed-main-font; horizontal-alignment: center; vertical-alignment: center; }
+        if root.speed-available: Text { x: root.speed-group-x + root.speed-main-width; y: 67.5px; width: 49px; height: 44px; text: root.speed-fraction; color: white; font-family: "EKD01 Speed"; font-size: 58px; vertical-alignment: center; }
+        if !root.speed-available: Text { x: 4px; y: -11px; width: 232px; height: 130px; text: "--.-"; color: white; font-family: "EKD01 Speed"; font-size: 150px; horizontal-alignment: center; vertical-alignment: center; }
+        Text { x: 8px; y: 116px; width: 220px; height: 14px; text: root.status != "" ? root.status : root.error != "" ? root.error : root.speed-unit; color: root.status-error ? #ff6868 : root.error == "" ? white : root.fault ? #ff6868 : #ffbd55; font-size: 14px; }
+        Rectangle { x: 236px; y: 15px; width: 4px; height: 120px; background: #1c2939;
+            Rectangle { y: parent.height - self.height; width: parent.width; height: parent.height * root.speed-fill / 100; background: #45d0e8; }
+        }
+        Text { x: 8px; y: 130px; width: 140px; height: 27px; text: root.power; color: white; font-size: 18px; }
+        if root.lights: Text { x: 150px; y: 134px; width: 54px; text: root.lights-text; color: #f4a34d; font-size: 14px; }
+        if root.bluetooth != 0: Image { x: 212px; y: 133px; width: 17px; height: 20px; source: @image-url("../assets/bluetooth.svg"); colorize: root.bluetooth == 3 ? #57b894 : root.bluetooth == 2 ? #45d0e8 : #f4a34d; }
+        Rectangle { x: 8px; y: 159px; width: 232px; height: 4px; background: #1c2939;
+            Rectangle { width: parent.width * root.power-fill / 100; height: parent.height; background: #f4a34d; }
+        }
+        Rectangle { x: 275px; y: 7px; width: 10px; height: 5px; background: #6b8093; border-radius: 1px; }
+        Rectangle { x: 266px; y: 12px; width: 28px; height: 126px; background: #6b8093; border-radius: 3px;
+            Rectangle { x: 3px; y: 3px; width: 22px; height: 120px; background: #1c2939;
+                Rectangle { y: parent.height - self.height; width: parent.width; height: parent.height * root.battery / 100; background: root.battery <= 10 ? #ff6868 : root.battery <= 25 ? #e4c45b : #57b894; }
+            }
+        }
+        Text { x: 243px; y: 144px; width: 74px; height: 32px; text: root.battery-text; color: white; font-size: 28px; horizontal-alignment: center; }
+        Rectangle { x: 8px; y: 183px; width: 304px; height: 1px; background: #1c2939; }
+        SummaryCard { x: 8px; y: 190px; width: 112px; height: 44px; caption: root.assist-caption; value: root.assist-text; }
+        Rectangle { x: 128px; y: 190px; width: 84px; height: 44px; background: #1c2939; border-radius: 6px;
+            Text { x: 8px; width: 68px; height: parent.height; text: root.voltage; color: white; font-size: 18px; horizontal-alignment: center; vertical-alignment: center; }
+        }
+        SummaryCard { x: 220px; y: 190px; width: 92px; height: 44px; caption: root.trip-caption; value: root.trip-text; }
+    }
+    if root.view != 0: Rectangle {
+        background: transparent;
+        Text { x: 10px; y: 7px; width: 300px; height: 25px; text: root.page-title; color: white; font-size: 19px; }
+        if root.view == 1: Rectangle {
+            for row[index] in root.rows: SummaryCard { x: 8px + mod(index, 2) * 156px; y: 36px + floor(index / 2) * 65px; width: 148px; height: 58px; caption: row.label; value: row.value; }
+        }
+        if root.view == 2: Rectangle {
+            for row[index] in root.rows: Rectangle {
+                x: 8px; y: 36px + index * 36px; width: 304px; height: 34px;
+                background: row.active ? #24475b : #1c2939; border-radius: 5px;
+                Text { x: 8px; width: 179px; height: parent.height; text: row.label; color: white; font-size: 14px; vertical-alignment: center; }
+                Text { x: 188px; width: 108px; height: parent.height; text: row.value; color: white; font-size: 14px; horizontal-alignment: right; vertical-alignment: center; }
+            }
+        }
+        if root.view == 3 || root.view == 4: Text {
+            x: 10px; y: 38px; width: 300px; height: 178px; text: root.info-body; color: white; font-size: 14px; wrap: word-wrap;
+        }
+        Text { x: 8px; y: 219px; width: 304px; height: 18px; text: root.status; color: root.status-error ? #ff6868 : white; font-size: 13px; }
+    }
+}

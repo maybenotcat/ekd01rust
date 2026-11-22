@@ -1,0 +1,49 @@
+[package]
+name = "ekd01rust"
+version = "0.1.0"
+edition = "2024"
+publish = false
+build = "build.rs"
+
+[dependencies]
+critical-section = { version = "1.2", features = ["restore-state-u32"] }
+portable-atomic = { version = "1.11", features = ["critical-section"] }
+embassy-executor = { version = "=0.10.0", features = ["platform-spin", "executor-thread"] }
+embassy-time = { version = "=0.5.1", features = ["tick-hz-128"] }
+embassy-time-driver = { version = "=0.2.2", features = ["tick-hz-128"] }
+embassy-time-queue-utils = { version = "0.3", features = ["_generic-queue"] }
+embassy-sync = "0.8"
+embassy-futures = "0.1"
+static_cell = "2.1"
+heapless = { version = "0.9", features = ["portable-atomic-critical-section"] }
+bitflags = "2"
+embedded-alloc = { version = "0.6", default-features = false, features = ["llff"] }
+embedded-io = "0.7"
+embedded-io-async = "0.7"
+bt-hci = "0.10"
+bt-hci-transport = "0.1"
+trouble-host = { version = "=0.8.0", default-features = false, features = ["peripheral", "gatt", "derive", "default-packet-pool"] }
+littlefs_rust = { package = "littlefs2-rust", version = "=0.1.1", default-features = false }
+slint = { version = "=1.15.1", default-features = false, features = ["compat-1-2", "unsafe-single-threaded", "libm", "renderer-software"] }
+
+[build-dependencies]
+slint-build = "=1.15.1"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+debug = 2
+
+[profile.dev]
+panic = "abort"
+
+[patch.crates-io]
+i-slint-compiler = { path = "third_party/slint-compiler" }
+embassy-executor = { path = "third_party/embassy-executor" }
+lock_api = { path = "third_party/lock_api" }
+futures-intrusive = { path = "third_party/futures-intrusive" }
+embassy-sync = { path = "third_party/embassy-sync" }
+littlefs2-rust = { path = "third_party/littlefs_rust" }
+

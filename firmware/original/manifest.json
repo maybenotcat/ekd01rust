@@ -1,0 +1,29 @@
+﻿{
+    "source":  "Original EKD01 N22 distribution, BL/EXT_BL copied unchanged",
+    "files":  [
+                  {
+                      "path":  "EKD01_CAN_BF_BOOTLOADER_V005_MT2502_EKD01_CAN_BF_N22.bin",
+                      "sha256":  "b10cc9bfc364662b97937999cfc444bc689c9612c824ac89c98b69be0a58dd77",
+                      "bytes":  8180
+                  },
+                  {
+                      "path":  "EXT_BOOTLOADER",
+                      "sha256":  "e7d49e028cd47eb81e4e29a61ff4b09dcafb5288577aa501556fa5754139c481",
+                      "bytes":  154700
+                  },
+                  {
+                      "path":  "main-gfh.bin",
+                      "sha256":  "900321b130d4d4ff05ad26cf3e2e6e39d04d49b957813956a3c2d402a84ba87b",
+                      "bytes":  1312
+                  },
+                  {
+                      "path":  "SOUTHBASE2502C_WT_11C_BB.cfg",
+                      "sha256":  "704eefb8aad84faeafec837f602dfcee67f79a6d2814ed0733ebcd777b69e6c0",
+                      "bytes":  3507
+                  }
+              ],
+    "reference_main":  {
+                           "sha256":  "f964f7bb1df082a5c61cff299ec2c3d40b5024e144b3275e3bd4a0f019d9790b",
+                           "file":  "EKD01_CAN_BF_PCB01_gsm_MT2502_S00.EKD01_CAN_BF_N22.bin"
+                       }
+}

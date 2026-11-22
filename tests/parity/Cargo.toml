@@ -1,0 +1,17 @@
+[package]
+name = "ekd01rust-parity"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+bitflags = "2"
+critical-section = { version = "1.2", features = ["std"] }
+littlefs_rust = { package = "littlefs2-rust", path = "../../third_party/littlefs_rust", default-features = false }
+
+[lib]
+path = "lib.rs"
+
+[profile.test]
+opt-level = 1
+debug = 0

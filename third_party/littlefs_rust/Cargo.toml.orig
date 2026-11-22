@@ -1,0 +1,34 @@
+[package]
+name = "littlefs2-rust"
+version = "0.1.1"
+edition = "2024"
+rust-version = "1.88"
+description = "Pure Rust littlefs implementation with a mounted block-device API"
+readme = "README.md"
+documentation = "https://docs.rs/littlefs2-rust"
+repository = "https://github.com/duanjr/littlefs-rust"
+license = "MIT"
+keywords = ["littlefs", "filesystem", "embedded", "flash", "no-std"]
+categories = ["embedded", "filesystem", "no-std"]
+include = [
+    "/CHANGELOG.md",
+    "/Cargo.lock",
+    "/Cargo.toml",
+    "/LICENSE",
+    "/README.md",
+    "/docs/**",
+    "/src/**",
+]
+
+[lib]
+name = "littlefs_rust"
+path = "src/lib.rs"
+
+[features]
+default = ["std"]
+std = []
+
+[dependencies]
+
+[package.metadata.docs.rs]
+features = ["std"]

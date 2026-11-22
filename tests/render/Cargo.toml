@@ -1,0 +1,16 @@
+[package]
+name = "ekd01rust-render-check"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+slint = { version = "=1.15.1", default-features = false, features = ["compat-1-2", "unsafe-single-threaded", "libm", "renderer-software"] }
+
+[build-dependencies]
+slint-build = "=1.15.1"
+
+[workspace]
+
+[patch.crates-io]
+i-slint-compiler = { path = "../../third_party/slint-compiler" }

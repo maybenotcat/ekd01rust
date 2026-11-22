@@ -1,0 +1,18 @@
+[build]
+target = "armv5te-none-eabi"
+jobs = 2
+
+[env]
+SLINT_FONT_ATLAS_CONFIG = { value = "config/font-atlases.txt", relative = true }
+SLINT_FONT_ATLAS_REPORT = { value = "build/font-atlases.tsv", relative = true }
+RAYON_NUM_THREADS = "2"
+
+[target.armv5te-none-eabi]
+rustflags = ["-C", "link-arg=-Tplatform/link.ld", "-C", "relocation-model=static"]
+
+[unstable]
+build-std = ["core", "alloc", "compiler_builtins"]
+build-std-features = ["compiler-builtins-mem"]
+
+
+

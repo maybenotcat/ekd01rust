@@ -1,0 +1,8 @@
+{
+  "source": "original EKD01 CAN BF N22",
+  "address": "0x1039a399",
+  "bytes": 26894,
+  "header_bytes": 30,
+  "sha256": "6f60182be16ce89c65822aaff6ada86cff9bdeb92fbf63abf98aaab9d4e6704b",
+  "purpose": "BT controller ROM patch, not host executable code"
+}
