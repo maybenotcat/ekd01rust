@@ -7,4 +7,5 @@ __pycache__/
 /tools/
 /vendor/
 /README*
+!/README.md
 /*.log

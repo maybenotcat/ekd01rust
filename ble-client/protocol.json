@@ -1,0 +1,9 @@
+{
+  "name": "EKD01Free",
+  "serviceUuid": "7b8d0001-6f53-4ea1-9b66-734b1dd1e001",
+  "characteristicUuid": "7b8d0002-6f53-4ea1-9b66-734b1dd1e001",
+  "version": 1,
+  "frameBytes": 20,
+  "pageCount": 3,
+  "periodMs": 250
+}

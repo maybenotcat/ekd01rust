@@ -6,7 +6,7 @@ publish = false
 build = "build.rs"
 
 [workspace]
-members = ["xtask", "flasher"]
+members = ["xtask", "flasher", "ble-client"]
 default-members = ["."]
 resolver = "3"
 
