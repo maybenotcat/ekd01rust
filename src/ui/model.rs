@@ -391,7 +391,7 @@ impl UiModel {
         }
         if self.navigation.confirm_reset {
             match item {
-                Trip => actions |= Actions::RESET_TRIP,
+                Trip => actions |= Actions::RESET_TRIP | Actions::SAVE,
                 ServiceReset => {
                     self.preferences.since_service_m = 0;
                     actions |= Actions::SAVE;

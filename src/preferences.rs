@@ -48,6 +48,7 @@ pub struct Preferences {
     pub settings: Settings,
     pub since_service_m: u32,
     pub odometer_m: u32,
+    pub trip_m: u32,
     pub errors: [u32; 10],
 }
 impl Preferences {
@@ -68,7 +69,7 @@ impl Preferences {
 
 #[derive(Clone)]
 struct Record {
-    bytes: [u8; 88],
+    bytes: [u8; 92],
 }
 impl Record {
     fn word(&self, offset: usize) -> u32 {
@@ -78,13 +79,15 @@ impl Record {
         self.bytes[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
     }
     fn decode(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() != 88 {
+        if !matches!(bytes.len(), 88 | 92) {
             return None;
         }
-        let record = Self {
-            bytes: bytes.try_into().ok()?,
-        };
+        let mut record = Self { bytes: [0; 92] };
+        record.bytes[..bytes.len()].copy_from_slice(bytes);
         let version = record.word(4);
+        if bytes.len() != if version == 5 { 92 } else { 88 } {
+            return None;
+        }
         let flags = record.word(24);
         let mask = (if version >= 4 { 1 << 12 } else { 0 })
             | 255
@@ -95,7 +98,7 @@ impl Record {
                 0
             };
         if record.word(0) != 0x46504b45
-            || !(1..=4).contains(&version)
+            || !(1..=5).contains(&version)
             || !(1..=5).contains(&record.word(12))
             || record.word(16) > 1
             || !matches!(record.word(20), 3 | 5 | 9)
@@ -105,10 +108,11 @@ impl Record {
         {
             return None;
         }
+        let crc_offset = if version >= 5 { 88 } else { 84 };
         if version >= 3
             && (record.word(32) > 10000
                 || record.word(32) % 500 != 0
-                || record.word(84) != crc32(&record.bytes[..84]))
+                || record.word(crc_offset) != crc32(&record.bytes[..crc_offset]))
         {
             return None;
         }
@@ -137,6 +141,9 @@ impl Record {
             out.settings.service_interval_km = self.word(32);
             out.since_service_m = self.word(36);
             out.odometer_m = self.word(40);
+            if version >= 5 {
+                out.trip_m = self.word(84);
+            }
             for (index, error) in out.errors.iter_mut().enumerate() {
                 *error = self.word(44 + index * 4);
             }
@@ -144,7 +151,7 @@ impl Record {
         out
     }
     fn encode(preferences: &Preferences, sequence: u32) -> Self {
-        let mut record = Self { bytes: [0; 88] };
+        let mut record = Self { bytes: [0; 92] };
         let settings = &preferences.settings;
         let flags = settings.auto_off_minutes as u32
             | ((settings.bluetooth as u32) << 8)
@@ -153,7 +160,7 @@ impl Record {
             | ((settings.theme as u32) << 12);
         for (offset, value) in [
             (0, 0x46504b45),
-            (4, 4),
+            (4, 5),
             (8, sequence),
             (12, settings.brightness as u32),
             (16, settings.imperial as u32),
@@ -162,6 +169,7 @@ impl Record {
             (32, settings.service_interval_km),
             (36, preferences.since_service_m),
             (40, preferences.odometer_m),
+            (84, preferences.trip_m),
         ] {
             record.put(offset, value);
         }
@@ -169,7 +177,7 @@ impl Record {
         for (index, error) in preferences.errors.iter().enumerate() {
             record.put(44 + index * 4, *error);
         }
-        record.put(84, crc32(&record.bytes[..84]));
+        record.put(88, crc32(&record.bytes[..88]));
         record
     }
 }
@@ -221,7 +229,7 @@ impl SettingsManager {
                         .as_ref()
                         .is_none_or(|old| Self::newer(record.word(8), old.word(8)))
                     {
-                        self.last_current = record.word(4) == 4;
+                        self.last_current = record.word(4) == 5;
                         newest = Some(record);
                         self.slot = slot;
                         self.file_source = true;

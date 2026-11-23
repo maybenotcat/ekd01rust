@@ -181,6 +181,14 @@ impl MotorClient {
     pub fn clear_trip(&mut self) {
         self.status.telemetry.reset_trip();
     }
+    /// Restore only the user trip total; the incoming counter still needs a new
+    /// baseline, and session travel must start at zero to avoid double-counting ODO.
+    pub fn restore_trip(&mut self, metres: u32) {
+        self.status.telemetry.trip_m = metres;
+        if metres != 0 {
+            DebugUart::hex("[ODO] TRIP_RESTORED_M", metres);
+        }
+    }
     pub fn busy(&self) -> bool {
         // Waiting for unsolicited 3203 does not occupy the block protocol.
         matches!(

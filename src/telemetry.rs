@@ -1,3 +1,4 @@
+use crate::odometer::DistanceCounter;
 use crate::protocol::{CanFrame, motor_reply};
 
 #[derive(Clone, Copy, Default)]
@@ -17,8 +18,7 @@ pub struct Telemetry {
     pub current: i16,
     pub controller_c: i16,
     pub motor_c: i16,
-    previous_distance: u16,
-    have_distance: bool,
+    distance: DistanceCounter,
     pub battery: u8,
     pub cadence: u8,
     pub error: u32,
@@ -61,20 +61,19 @@ impl Telemetry {
         match (motor_reply(frame.id), frame.length) {
             (Some((0, 0x3200)), 8) => {
                 let distance = le(1);
-                if self.have_distance {
-                    let delta = distance.wrapping_sub(self.previous_distance) as i16;
-                    if delta > 0 {
-                        let metres = delta as u32 * 10;
-                        if let Some(value) = self.trip_m.checked_add(metres) {
-                            self.trip_m = value;
-                        }
-                        if let Some(value) = self.travel_m.checked_add(metres) {
-                            self.travel_m = value;
-                        }
-                    }
+                let previous_faults = self.distance.discontinuities;
+                let metres = self.distance.observe(distance, now);
+                self.trip_m = self.trip_m.saturating_add(metres);
+                self.travel_m = self.travel_m.saturating_add(metres);
+                if self.distance.discontinuities != previous_faults
+                    && self.distance.discontinuities <= 4
+                {
+                    crate::soc::DebugUart::hex(
+                        "[ODO] COUNTER_DISCONTINUITY",
+                        self.distance.discontinuities,
+                    );
+                    crate::soc::DebugUart::hex("[ODO] COUNTER_RAW", distance as u32);
                 }
-                self.previous_distance = distance;
-                self.have_distance = true;
                 self.battery = d[0];
                 self.cadence = d[3];
                 self.range = le(6);

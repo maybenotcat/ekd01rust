@@ -7,6 +7,7 @@ use crate::{
         client::{BasicStatus, MotorClient},
         settings::BlockId,
     },
+    odometer::DistanceCheckpoint,
     preferences::SettingsManager,
     soc::{
         DebugUart,
@@ -43,6 +44,7 @@ pub struct Application {
     buttons: Buttons,
     motor: MotorClient,
     settings: SettingsManager,
+    distance_checkpoint: DistanceCheckpoint,
     model: UiModel,
     ui: UserInterface,
     power: PowerFlow,
@@ -75,6 +77,7 @@ impl Application {
         let now = Timer::now();
         let buttons = Buttons::initialize(now);
         let mut motor = MotorClient::start(now);
+        motor.restore_trip(preferences.trip_m);
         motor.controls(
             model.preferences.settings.levels,
             0,
@@ -91,6 +94,7 @@ impl Application {
             buttons,
             motor,
             settings,
+            distance_checkpoint: DistanceCheckpoint::new(now, &preferences),
             model,
             ui,
             power: PowerFlow::default(),
@@ -140,6 +144,7 @@ impl Application {
         }
         if actions.contains(Actions::RESET_TRIP) {
             self.motor.clear_trip();
+            model.preferences.trip_m = 0;
         }
         if actions.contains(Actions::CLOCK) {
             model.clock_valid = self.rtc.set(ClockTime {
@@ -219,6 +224,7 @@ impl Application {
         self.model
             .preferences
             .record_distance(telemetry.travel_m.wrapping_sub(self.seen_travel));
+        self.model.preferences.trip_m = telemetry.trip_m;
         self.seen_travel = telemetry.travel_m;
         let count = telemetry
             .history_serial
@@ -263,6 +269,8 @@ impl Application {
     fn save(&mut self) -> bool {
         let result = self.settings.save(&self.model.preferences);
         self.model.save_error = result.is_err();
+        self.distance_checkpoint
+            .finished(Timer::now(), &self.model.preferences, result.is_ok());
         if let Err(error) = result {
             use core::fmt::Write;
             let _ = writeln!(DebugUart, "[SETTINGS] SAVE_FAILED: {error:?}");
@@ -356,7 +364,15 @@ impl Application {
                 self.ui.render().await.expect("LCD DMA");
             }
             // Publish the requested screen before a synchronous settings operation.
-            if self.save_pending && self.power.state == PowerState::Running {
+            let checkpoint_due = self
+                .distance_checkpoint
+                .due(Timer::now(), &self.model.preferences)
+                && !self.model.navigation.editing
+                && !self.motor.busy();
+            if (self.save_pending || checkpoint_due) && self.power.state == PowerState::Running {
+                if checkpoint_due && !self.save_pending {
+                    DebugUart::log("[ODO] CHECKPOINT_60S\n");
+                }
                 self.save_pending = false;
                 self.save();
                 self.next_render = Timer::now();

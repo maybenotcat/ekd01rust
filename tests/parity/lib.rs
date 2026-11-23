@@ -58,6 +58,8 @@ pub mod crc;
 pub mod input;
 #[path = "../../src/preferences.rs"]
 pub mod preferences;
+#[path = "../../src/odometer.rs"]
+pub mod odometer;
 #[path = "../../src/protocol.rs"]
 pub mod protocol;
 #[path = "../../src/storage.rs"]
@@ -69,6 +71,8 @@ pub mod bluetooth;
 pub mod motor;
 #[cfg(test)]
 mod motor_regression;
+#[cfg(test)]
+mod odometer_regression;
 pub mod ui;
 pub mod soc {
     pub mod bridge_uart {
