@@ -46,3 +46,9 @@ cargo ble-client
 ```
 
 Enable Bluetooth on the display, scan and connect. The client is read-only. On Linux, it uses BlueZ; building also requires `pkg-config` and `libdbus-1-dev`.
+
+## EKD01 CAN PCB
+
+![Display PCB photo 1](images/pcb1.jpg)
+
+![Display PCB photo 2](images/pcb2.jpg)
