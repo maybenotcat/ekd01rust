@@ -5,6 +5,26 @@ pub const WRITE_BASIC_SETTINGS: u32 = 0x05103203;
 pub const MOTOR_RIDE: u32 = 0x02f83200;
 pub const MOTOR_ELECTRIC: u32 = 0x02f83201;
 pub const MOTOR_BASIC_SETTINGS: u32 = 0x02f83203;
+pub const WRITE_ASSIST_LEVELS: u32 = 0x05103209;
+
+/// N22 metric speed editor and wheel editor bounds. These describe the display
+/// UI, not a guarantee that every motor accepts every value in these ranges.
+pub mod basic_bounds {
+    pub const LIMIT_MIN_X100: u16 = 100;
+    pub const LIMIT_MAX_X100: u16 = 9900;
+    pub const WHEEL_MIN_X10: u16 = 60;
+    pub const WHEEL_MAX_X10: u16 = 340;
+    pub const CIRCUMFERENCE_MIN_MM: u16 = 400;
+    pub const CIRCUMFERENCE_MAX_MM: u16 = 3000;
+}
+
+/// Bafang identifiers contain a five-bit destination and a three-bit operation.
+/// N22 routes incoming motor messages by source (100CDC70), then operation and
+/// command (100EB9E4). Destination bits are not part of the command: a reply to
+/// display 3 has 0x18 here, whereas a broadcast has 0xf8.
+pub fn motor_reply(id: u32) -> Option<(u8, u16)> {
+    (id <= 0x1fff_ffff && id >> 24 == 2).then_some((((id >> 16) & 7) as u8, id as u16))
+}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct CanFrame {
@@ -61,9 +81,10 @@ impl CanFrame {
         })
     }
     pub fn basic_settings(limit: u16, wheel: u16, circumference: u16) -> Option<Self> {
-        if !(1000..=5000).contains(&limit)
-            || !(100..=290).contains(&wheel)
-            || !(700..=3000).contains(&circumference)
+        use basic_bounds::*;
+        if !(LIMIT_MIN_X100..=LIMIT_MAX_X100).contains(&limit)
+            || !(WHEEL_MIN_X10..=WHEEL_MAX_X10).contains(&wheel)
+            || !(CIRCUMFERENCE_MIN_MM..=CIRCUMFERENCE_MAX_MM).contains(&circumference)
         {
             return None;
         }
@@ -74,11 +95,15 @@ impl CanFrame {
         data[4..].copy_from_slice(&circumference.to_le_bytes());
         Self::new(WRITE_BASIC_SETTINGS, &data)
     }
+    /// N22 100EBDF0 -> 1010D7AE: a separate configuration message, not 6300.
+    pub fn assist_levels(levels: u8) -> Option<Self> {
+        matches!(levels, 3 | 5 | 9).then(|| Self::new(WRITE_ASSIST_LEVELS, &[levels, 0]).unwrap())
+    }
 }
 
 pub const VERSION_QUERY: [u8; 5] = [0xf5, 0x42, 1, 1, 0x0d];
 pub fn wheel_circumference(wheel: u16) -> Option<u16> {
-    (100..=290)
+    (basic_bounds::WHEEL_MIN_X10..=basic_bounds::WHEEL_MAX_X10)
         .contains(&wheel)
         .then(|| (wheel as u32 * 7_979_645 / 1_000_000) as u16)
 }

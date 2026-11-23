@@ -16,6 +16,7 @@ bitflags::bitflags! {
         const SHUTDOWN=16; const MOTOR_APPLY=32; const CLOCK=64; const RESET_SETTINGS=128;
         const BLUETOOTH=256; const ADV_READ=512; const ADV_APPLY=1024;
         const START_READ=2048; const START_APPLY=4096; const SAVE=8192;
+        const MOTOR_READ=16384;
     }
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -67,30 +68,9 @@ impl Page {
             Self::Display => &[
                 Units, Brightness, Theme, AutoOff, Trip, Hour, Minute, Language, Service, Back,
             ],
-            Self::Motor => &[
-                Levels,
-                Limit,
-                Wheel,
-                Circumference,
-                Apply,
-                ControllerValues,
-                Advanced,
-                Back,
-            ],
+            Self::Motor => &[Levels, Limit, Wheel, Circumference, Advanced, Back],
             Self::Information => &[BatteryInfo, Errors, ErrorClear, Diagnostics, Back],
-            Self::Advanced => &[
-                AdvRead,
-                Current,
-                Speed,
-                AdvApply,
-                AdvDiscard,
-                StartRead,
-                Start,
-                StartApply,
-                StartDiscard,
-                PowerMode,
-                Back,
-            ],
+            Self::Advanced => &[Current, Speed, Start, PowerMode, Back],
             Self::Service => &[
                 ServiceInterval,
                 ServiceDistance,
@@ -161,6 +141,8 @@ pub struct UiModel {
     pub minute: u8,
     pub clock_valid: bool,
     pub save_error: bool,
+    pub motor_busy: bool,
+    pub motor_online: bool,
 }
 impl UiModel {
     pub fn new(preferences: Preferences) -> Self {
@@ -176,6 +158,8 @@ impl UiModel {
             minute: 0,
             clock_valid: false,
             save_error: false,
+            motor_busy: false,
+            motor_online: false,
         }
     }
     pub fn count(&self) -> usize {
@@ -215,12 +199,9 @@ impl UiModel {
             .unwrap_or(0);
     }
     pub fn motor_readback(&mut self, limit: u16, wheel: u16, circumference: u16) {
-        if self.navigation.editing
-            || self.basic.dirty
-            || !(1000..=5000).contains(&limit)
-            || !(100..=290).contains(&wheel)
-            || !(700..=3000).contains(&circumference)
-        {
+        // A complete controller status must remain visible even when its values
+        // lie outside our editor bounds. Validate writes at the protocol boundary.
+        if self.navigation.editing || self.basic.dirty {
             return;
         }
         self.basic = BasicDraft {
@@ -310,21 +291,39 @@ impl UiModel {
                 actions |= Actions::CONTROLS;
             }
             Limit => {
-                self.basic.limit_x10 =
-                    Self::adjust(self.basic.limit_x10 as u32, direction, 100, 500, 10) as u16;
+                use crate::protocol::basic_bounds::*;
+                self.basic.limit_x10 = Self::adjust(
+                    self.basic.limit_x10 as u32,
+                    direction,
+                    (LIMIT_MIN_X100 / 10) as u32,
+                    (LIMIT_MAX_X100 / 10) as u32,
+                    10,
+                ) as u16;
                 self.basic.valid |= 1;
                 self.basic.dirty = true;
             }
             Wheel => {
-                self.basic.wheel =
-                    Self::adjust(self.basic.wheel as u32, direction, 100, 290, 5) as u16;
+                use crate::protocol::basic_bounds::*;
+                self.basic.wheel = Self::adjust(
+                    self.basic.wheel as u32,
+                    direction,
+                    WHEEL_MIN_X10 as u32,
+                    WHEEL_MAX_X10 as u32,
+                    5,
+                ) as u16;
                 self.basic.circumference = wheel_circumference(self.basic.wheel).unwrap_or(0);
                 self.basic.valid |= 6;
                 self.basic.dirty = true;
             }
             Circumference => {
-                self.basic.circumference =
-                    Self::adjust(self.basic.circumference as u32, direction, 700, 3000, 1) as u16;
+                use crate::protocol::basic_bounds::*;
+                self.basic.circumference = Self::adjust(
+                    self.basic.circumference as u32,
+                    direction,
+                    CIRCUMFERENCE_MIN_MM as u32,
+                    CIRCUMFERENCE_MAX_MM as u32,
+                    1,
+                ) as u16;
                 self.basic.valid |= 4;
                 self.basic.dirty = true;
             }
@@ -363,6 +362,16 @@ impl UiModel {
         use Item::*;
         self.navigation.editing = false;
         let mut actions = Actions::REDRAW;
+        if matches!(item, Limit | Wheel | Circumference) && self.basic.dirty {
+            actions |= Actions::MOTOR_APPLY;
+        }
+        if LEVEL_ITEMS.contains(&item) && self.draft_mut().dirty {
+            actions |= if self.navigation.page == Page::Start {
+                Actions::START_APPLY
+            } else {
+                Actions::ADV_APPLY
+            };
+        }
         if matches!(
             item,
             Brightness
@@ -416,45 +425,44 @@ impl UiModel {
         let mut actions = Actions::REDRAW;
         match item {
             Display => self.enter(Page::Display),
-            Motor => self.enter(Page::Motor),
+            Motor => {
+                self.enter(Page::Motor);
+                if !self.basic.dirty {
+                    self.basic.valid = 0;
+                    actions |= Actions::MOTOR_READ;
+                }
+            }
             Information => self.enter(Page::Information),
-            Advanced => self.enter(Page::Advanced),
-            Current => self.enter(Page::Current),
-            Speed => self.enter(Page::Speed),
-            Start => self.enter(Page::Start),
+            Advanced => {
+                self.enter(Page::Advanced);
+                if !self.limits.dirty {
+                    self.limits.valid = false;
+                    actions |= Actions::ADV_READ;
+                }
+            }
+            Current | Speed => {
+                self.enter(if item == Current {
+                    Page::Current
+                } else {
+                    Page::Speed
+                });
+                if !self.limits.valid && !self.motor_busy {
+                    actions |= Actions::ADV_READ;
+                }
+            }
+            Start => {
+                self.enter(Page::Start);
+                if !self.start.dirty {
+                    self.start.valid = false;
+                    actions |= Actions::START_READ;
+                }
+            }
             Service => self.enter(Page::Service),
             Back => self.back(),
             Exit => {
                 self.navigation.view = View::Dashboard;
                 actions |= Actions::SAVE;
             }
-            Apply => actions |= Actions::MOTOR_APPLY,
-            ControllerValues => {
-                self.basic.dirty = false;
-                self.basic.valid = 0;
-            }
-            AdvRead => {
-                if !self.limits.dirty {
-                    actions |= Actions::ADV_READ;
-                }
-            }
-            AdvApply => {
-                if self.limits.valid && self.limits.dirty {
-                    actions |= Actions::ADV_APPLY;
-                }
-            }
-            AdvDiscard => self.limits = Draft::default(),
-            StartRead => {
-                if !self.start.dirty {
-                    actions |= Actions::START_READ;
-                }
-            }
-            StartApply => {
-                if self.start.valid && self.start.dirty {
-                    actions |= Actions::START_APPLY;
-                }
-            }
-            StartDiscard => self.start = Draft::default(),
             ServiceDistance | Odometer => {}
             Diagnostics => self.navigation.view = View::Diagnostics,
             BatteryInfo | CtrlInfo | DisplayInfo | TorqueInfo | Errors | Sensitivity => {
@@ -462,7 +470,16 @@ impl UiModel {
                 self.navigation.view = View::Information;
             }
             _ => {
-                if !LEVEL_ITEMS.contains(&item) || self.draft_mut().valid {
+                let motor_value =
+                    matches!(item, Limit | Wheel | Circumference) || LEVEL_ITEMS.contains(&item);
+                let loaded = if matches!(item, Limit | Wheel | Circumference) {
+                    self.basic.valid == 7
+                } else {
+                    self.draft_mut().valid
+                };
+                if !motor_value
+                    || loaded && !self.motor_busy && self.motor_online && self.assist == 0
+                {
                     self.navigation.editing = true;
                 }
             }
@@ -479,6 +496,11 @@ impl UiModel {
         if pair == 3 {
             let started = *self.navigation.combo_started.get_or_insert(now);
             if !self.navigation.combo_fired && now.wrapping_sub(started) >= 256 {
+                let edit_actions = if self.navigation.editing {
+                    self.finish_edit(self.item(self.navigation.selected))
+                } else {
+                    Actions::empty()
+                };
                 self.navigation.combo_fired = true;
                 self.navigation.view = if self.navigation.view == View::Menu {
                     View::Dashboard
@@ -487,6 +509,7 @@ impl UiModel {
                 };
                 self.enter(Page::Root);
                 return Actions::REDRAW
+                    | edit_actions
                     | if self.navigation.view == View::Dashboard {
                         Actions::SAVE
                     } else {

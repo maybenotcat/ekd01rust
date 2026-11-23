@@ -3,9 +3,7 @@ use super::{
     transfer::{AdvancedView, BlockTransfer, RequestResult, TransferStatus},
 };
 use crate::{
-    protocol::{
-        BridgeMessage, BridgeParser, CanFrame, MOTOR_BASIC_SETTINGS, McuMessage, VERSION_QUERY,
-    },
+    protocol::{BridgeMessage, BridgeParser, CanFrame, McuMessage, VERSION_QUERY, motor_reply},
     soc::{DebugUart, bridge_uart::BridgeUart},
     telemetry::Telemetry,
 };
@@ -14,6 +12,8 @@ use crate::{
 pub enum BasicStatus {
     #[default]
     Idle,
+    Reading,
+    Loaded,
     Queued,
     Sent,
     Verified,
@@ -67,7 +67,11 @@ impl BikeStatus {
     fn request_check(&self, now: u32, busy: bool, neutral: bool) -> RequestResult {
         if busy {
             RequestResult::Busy
-        } else if !self.active || self.stop_requested || self.stopped || !self.motor_online(now) {
+        } else if !self.active
+            || self.stop_requested
+            || self.stopped
+            || neutral && !self.motor_online(now)
+        {
             RequestResult::Offline
         } else if neutral && self.assist != 0 {
             RequestResult::NeedsNeutral
@@ -106,6 +110,10 @@ pub struct MotorClient {
     unknown: [u32; 8],
     unknown_count: usize,
     stop_sent: Option<u32>,
+    reported_basic: BasicStatus,
+    reported_advanced: TransferStatus,
+    read_after: Option<BlockId>,
+    levels_to_send: Option<u8>,
 }
 impl MotorClient {
     pub fn start(now: u32) -> Self {
@@ -128,6 +136,10 @@ impl MotorClient {
             unknown: [0; 8],
             unknown_count: 0,
             stop_sent: None,
+            reported_basic: BasicStatus::Idle,
+            reported_advanced: TransferStatus::Idle,
+            read_after: None,
+            levels_to_send: None,
         }
     }
     pub fn status(&self) -> &BikeStatus {
@@ -141,6 +153,9 @@ impl MotorClient {
         {
             return;
         }
+        if self.status.levels != levels {
+            self.levels_to_send = Some(levels);
+        }
         self.status.levels = levels;
         self.status.assist = assist;
         self.status.lights = lights;
@@ -150,6 +165,8 @@ impl MotorClient {
     pub fn stop(&mut self) {
         self.request = None;
         self.advanced.cancel();
+        self.read_after = None;
+        self.levels_to_send = None;
         self.status.advanced = self.advanced.view;
         self.status.assist = 0;
         self.status.lights = false;
@@ -164,17 +181,40 @@ impl MotorClient {
     pub fn clear_trip(&mut self) {
         self.status.telemetry.reset_trip();
     }
-    fn busy(&self) -> bool {
+    pub fn busy(&self) -> bool {
+        // Waiting for unsolicited 3203 does not occupy the block protocol.
         matches!(
             self.status.basic_state,
             BasicStatus::Queued | BasicStatus::Sent
         ) || self.request.is_some()
+            || self.read_after.is_some()
             || self.advanced.busy()
+    }
+    pub fn read_basic(&mut self, now: u32) -> RequestResult {
+        let result = self.status.request_check(now, self.busy(), false);
+        if result == RequestResult::Accepted {
+            self.status.basic_result = result;
+            // N22 does not issue a 3203 read request. Wait for the controller's
+            // status instead of manufacturing an unsupported CAN command.
+            self.status.basic_state = if self.status.telemetry.valid & 4 != 0 {
+                BasicStatus::Loaded
+            } else {
+                BasicStatus::Reading
+            };
+            self.status.basic_sent = now;
+            if self.status.basic_state == BasicStatus::Loaded {
+                Self::report_basic(&self.status);
+            } else {
+                DebugUart::log("[MOTOR] WAIT_BASIC_STATUS_3203\n");
+            }
+        }
+        result
     }
     pub fn apply_basic(&mut self, values: [u16; 3], now: u32) -> RequestResult {
         let mut result = self.status.request_check(now, self.busy(), true);
         if result == RequestResult::Accepted
-            && CanFrame::basic_settings(values[0], values[1], values[2]).is_none()
+            && (self.status.telemetry.valid & 4 == 0
+                || CanFrame::basic_settings(values[0], values[1], values[2]).is_none())
         {
             result = RequestResult::Invalid;
         }
@@ -234,6 +274,11 @@ impl MotorClient {
                 let mut result = self.status.request_check(now, false, request.writes());
                 if result == RequestResult::Accepted {
                     match request {
+                        Request::Read(BlockId::AssistLimits) => {
+                            // N22's parameter refresh reads 6010 before 6011.
+                            self.read_after = Some(BlockId::AssistLimits);
+                            self.advanced.read(BlockId::StartResponse, now);
+                        }
                         Request::Read(id) => self.advanced.read(id, now),
                         Request::Write(id, block, revision) => {
                             if !self.advanced.apply(id, &block, revision, now) {
@@ -250,8 +295,15 @@ impl MotorClient {
                 }
             }
         }
-        self.advanced.poll(now);
         self.status.advanced = self.advanced.view;
+    }
+    fn report_basic(status: &BikeStatus) {
+        DebugUart::hex("[MOTOR] BASIC_LIMIT_X100", status.telemetry.limit as u32);
+        DebugUart::hex("[MOTOR] BASIC_WHEEL_X10", status.telemetry.wheel as u32);
+        DebugUart::hex(
+            "[MOTOR] BASIC_CIRCUMFERENCE_MM",
+            status.telemetry.circumference as u32,
+        );
     }
     fn receive_can(
         status: &mut BikeStatus,
@@ -262,7 +314,18 @@ impl MotorClient {
         status.rx = status.rx.wrapping_add(1);
         status.last_id = frame.id;
         status.last_rx = now;
-        let recognized = status.telemetry.decode(frame, now) | advanced.receive(frame, now);
+        let progress = advanced.view.progress;
+        let block_reply = advanced.receive(frame, now);
+        let first_basic = status.telemetry.valid & 4 == 0;
+        let recognized = status.telemetry.decode(frame, now) | block_reply;
+        if block_reply
+            && motor_reply(frame.id).is_some_and(|(kind, _)| {
+                kind == 4 || kind == 6 || kind == 2 && matches!(progress, 0 | 64)
+            })
+        {
+            DebugUart::hex("[MOTOR] BLOCK_RX_ID", frame.id);
+            DebugUart::hex("[MOTOR] BLOCK_RX_DLC", frame.length as u32);
+        }
         if recognized && frame.id >> 24 == 2 {
             status.motor_rx = status.motor_rx.wrapping_add(1);
             status.last_motor_rx = now;
@@ -273,13 +336,25 @@ impl MotorClient {
             status.telemetry.wheel,
             status.telemetry.circumference,
         ];
-        if status.basic_state == BasicStatus::Sent
-            && frame.id == MOTOR_BASIC_SETTINGS
-            && frame.length == 6
-            && values == status.requested_basic
-        {
-            status.basic_state = BasicStatus::Verified;
-            DebugUart::log("[MOTOR] READBACK_MATCH\n");
+        if motor_reply(frame.id) == Some((0, 0x3203)) && frame.length == 6 {
+            if first_basic {
+                DebugUart::hex(
+                    "[MOTOR] BASIC_STATUS_RAW_0",
+                    u32::from_le_bytes(frame.data[..4].try_into().unwrap()),
+                );
+                DebugUart::hex(
+                    "[MOTOR] BASIC_STATUS_RAW_1",
+                    u16::from_le_bytes([frame.data[4], frame.data[5]]) as u32,
+                );
+                Self::report_basic(status);
+            }
+            if status.basic_state == BasicStatus::Reading {
+                status.basic_state = BasicStatus::Loaded;
+                DebugUart::hex("[MOTOR] BASIC_RX_ID", frame.id);
+            } else if status.basic_state == BasicStatus::Sent && values == status.requested_basic {
+                status.basic_state = BasicStatus::Verified;
+                DebugUart::log("[MOTOR] READBACK_MATCH\n");
+            }
         }
         status.last_frame = *frame;
         if status.rx == 1 {
@@ -371,9 +446,17 @@ impl MotorClient {
         }
         self.service_request(now);
         self.receive(now, key);
+        // Consume replies already buffered by the IRQ before expiring a request.
+        self.advanced.poll(now);
+        if self.read_after.is_some() && !self.advanced.busy() {
+            let next = self.read_after.take().unwrap();
+            if self.advanced.view.state == TransferStatus::Ready {
+                self.advanced.read(next, now);
+            }
+        }
         if matches!(
             self.status.basic_state,
-            BasicStatus::Queued | BasicStatus::Sent
+            BasicStatus::Reading | BasicStatus::Queued | BasicStatus::Sent
         ) && now.wrapping_sub(self.status.basic_sent) >= 256
         {
             self.status.basic_state = BasicStatus::Timeout;
@@ -393,6 +476,7 @@ impl MotorClient {
                     if self.send(frame) {
                         self.status.basic_state = BasicStatus::Sent;
                         self.status.basic_sent = now;
+                        DebugUart::hex("[MOTOR] BASIC_WRITE_TX", frame.id);
                     }
                 }
             }
@@ -403,7 +487,20 @@ impl MotorClient {
         if !self.status.stop_requested {
             if let Some(frame) = self.advanced.pending() {
                 if self.send(frame) {
+                    if (frame.id >> 16) & 7 <= 1 {
+                        DebugUart::hex("[MOTOR] BLOCK_TX_ID", frame.id);
+                    }
                     self.advanced.sent(now);
+                }
+            }
+        }
+        // Configuration changes share the sole UART writer. Do not interleave
+        // them with a parameter transaction; periodic 6300 control stays live.
+        if !self.busy() && !self.status.stop_requested {
+            if let Some(levels) = self.levels_to_send {
+                if self.send(CanFrame::assist_levels(levels).unwrap()) {
+                    self.levels_to_send = None;
+                    DebugUart::hex("[MOTOR] LEVELS_CONFIG_SENT", levels as u32);
                 }
             }
         }
@@ -436,6 +533,20 @@ impl MotorClient {
                     }
                 }
             }
+        }
+        if self.reported_basic != self.status.basic_state {
+            self.reported_basic = self.status.basic_state;
+            use core::fmt::Write;
+            let _ = writeln!(DebugUart, "[MOTOR] BASIC_STATE={:?}", self.reported_basic);
+        }
+        if self.reported_advanced != self.advanced.view.state {
+            self.reported_advanced = self.advanced.view.state;
+            use core::fmt::Write;
+            let _ = writeln!(
+                DebugUart,
+                "[MOTOR] BLOCK_STATE={:?}; BLOCK={:?}; BYTES={}",
+                self.reported_advanced, self.advanced.view.block_id, self.advanced.view.progress
+            );
         }
     }
 }

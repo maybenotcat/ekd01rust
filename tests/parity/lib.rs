@@ -67,19 +67,69 @@ pub mod telemetry;
 
 pub mod bluetooth;
 pub mod motor;
+#[cfg(test)]
+mod motor_regression;
 pub mod ui;
 pub mod soc {
     pub mod bridge_uart {
+        use std::{cell::RefCell, collections::VecDeque};
+        #[derive(Default)]
+        struct Wire {
+            input: VecDeque<u8>,
+            output: Vec<Vec<u8>>,
+            ready: bool,
+        }
+        std::thread_local! { static WIRE: RefCell<Option<Wire>> = const { RefCell::new(None) }; }
+        pub fn reset() {
+            WIRE.with(|wire| {
+                *wire.borrow_mut() = Some(Wire {
+                    ready: true,
+                    ..Default::default()
+                })
+            });
+        }
+        pub fn advance() {
+            WIRE.with(|wire| wire.borrow_mut().as_mut().unwrap().ready = true);
+        }
+        pub fn inject(frame: crate::protocol::CanFrame) {
+            let mut bytes = [0; 15];
+            let length = frame.encode(&mut bytes).unwrap();
+            WIRE.with(|wire| {
+                wire.borrow_mut()
+                    .as_mut()
+                    .unwrap()
+                    .input
+                    .extend(&bytes[..length])
+            });
+        }
+        pub fn output() -> Vec<Vec<u8>> {
+            WIRE.with(|wire| wire.borrow().as_ref().unwrap().output.clone())
+        }
         pub struct BridgeUart;
         impl BridgeUart {
             pub fn initialize() -> Self {
                 Self
             }
             pub fn receive(&mut self) -> Option<u8> {
-                None
+                WIRE.with(|wire| {
+                    wire.borrow_mut()
+                        .as_mut()
+                        .and_then(|wire| wire.input.pop_front())
+                })
             }
-            pub fn send(&mut self, _: &[u8]) -> bool {
-                false
+            pub fn send(&mut self, bytes: &[u8]) -> bool {
+                WIRE.with(|wire| {
+                    let mut wire = wire.borrow_mut();
+                    let Some(wire) = wire.as_mut() else {
+                        return false;
+                    };
+                    if !wire.ready {
+                        return false;
+                    }
+                    wire.ready = false;
+                    wire.output.push(bytes.to_vec());
+                    true
+                })
             }
             pub fn errors(&self) -> u32 {
                 0
@@ -88,6 +138,11 @@ pub mod soc {
         }
     }
     pub struct DebugUart;
+    impl core::fmt::Write for DebugUart {
+        fn write_str(&mut self, _: &str) -> core::fmt::Result {
+            Ok(())
+        }
+    }
     impl DebugUart {
         pub fn log(_: &str) {}
         pub fn hex(_: &str, _: u32) {}
@@ -614,7 +669,7 @@ mod checks {
         }
     }
     #[test]
-    fn transfer_bad_sequence_and_shutdown_retry_are_explicit_states() {
+    fn motor_transfer_ignores_bad_sequence_and_shutdown_retry_is_explicit() {
         use motor::{
             settings::BlockId,
             transfer::{BlockTransfer, TransferStatus},
@@ -625,7 +680,8 @@ mod checks {
         transfer.receive(&CanFrame::new(0x02fc6011, &[64]).unwrap(), 1);
         transfer.sent(1);
         assert!(!transfer.receive(&CanFrame::new(0x02fd0001, &[0; 8]).unwrap(), 2));
-        assert_eq!(transfer.view.state, TransferStatus::BadBlock);
+        assert_eq!(transfer.view.state, TransferStatus::Reading);
+        transfer.cancel();
         transfer.read(BlockId::StartResponse, 3);
         transfer.poll(259);
         assert_eq!(transfer.view.state, TransferStatus::Timeout);

@@ -1,4 +1,4 @@
-use crate::protocol::{CanFrame, MOTOR_BASIC_SETTINGS, MOTOR_ELECTRIC, MOTOR_RIDE};
+use crate::protocol::{CanFrame, motor_reply};
 
 #[derive(Clone, Copy, Default)]
 pub struct Telemetry {
@@ -33,7 +33,7 @@ impl Telemetry {
         let command = (frame.id >> 8) & 255;
         let sub = frame.id & 255;
         if matches!(source, 1 | 2 | 4 | 5)
-            && (frame.id >> 16) & 255 == 255
+            && (frame.id >> 16) & 7 == 7
             && (1..=8).contains(&frame.length)
             && sub <= 3
             && ((0x11..=0x17).contains(&command) || command == 0x1e)
@@ -58,8 +58,8 @@ impl Telemetry {
             return true;
         }
         let le = |offset: usize| u16::from_le_bytes([d[offset], d[offset + 1]]);
-        match (frame.id, frame.length) {
-            (MOTOR_RIDE, 8) => {
+        match (motor_reply(frame.id), frame.length) {
+            (Some((0, 0x3200)), 8) => {
                 let distance = le(1);
                 if self.have_distance {
                     let delta = distance.wrapping_sub(self.previous_distance) as i16;
@@ -81,7 +81,7 @@ impl Telemetry {
                 self.ride_tick = now;
                 self.valid |= 1;
             }
-            (MOTOR_ELECTRIC, 8) => {
+            (Some((0, 0x3201)), 8) => {
                 self.speed = le(0);
                 self.current = le(2) as i16;
                 self.voltage = le(4);
@@ -90,11 +90,23 @@ impl Telemetry {
                 self.electric_tick = now;
                 self.valid |= 2;
             }
-            (MOTOR_BASIC_SETTINGS, 6) => {
+            (Some((0, 0x3203)), 6) => {
                 self.limit = le(0);
                 let wheel = le(2);
                 self.wheel = (wheel >> 4) * 10 + (wheel & 15);
-                self.circumference = le(4);
+                let reported_circumference = le(4);
+                // N22 consumes only limit and wheel here (1010DE9C). Its
+                // setters derive circumference from wheel (100EC000/100EC0D8).
+                // Do not reject a useful status if the unused trailing word is
+                // zero or outside the supported circumference range.
+                use crate::protocol::basic_bounds::*;
+                self.circumference = if (CIRCUMFERENCE_MIN_MM..=CIRCUMFERENCE_MAX_MM)
+                    .contains(&reported_circumference)
+                {
+                    reported_circumference
+                } else {
+                    crate::protocol::wheel_circumference(self.wheel).unwrap_or(0)
+                };
                 self.limit_tick = now;
                 self.valid |= 4;
             }

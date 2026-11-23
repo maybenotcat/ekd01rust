@@ -1,13 +1,13 @@
 use super::{
     Row, UserInterface,
     data::{Item, translate},
-    model::{UiModel, View},
+    model::{Page, UiModel, View},
 };
 use crate::{
     bluetooth::state::BluetoothState,
     motor::{
         client::{BasicStatus, BikeStatus},
-        settings::Parameter,
+        settings::{BlockId, Parameter},
         transfer::{RequestResult, TransferStatus},
     },
 };
@@ -91,6 +91,8 @@ impl Presenter<'_> {
         } else {
             match self.bike.basic_state {
                 BasicStatus::Idle => "Apply",
+                BasicStatus::Reading => "Reading",
+                BasicStatus::Loaded => "Loaded",
                 BasicStatus::Queued => "Queued",
                 BasicStatus::Sent => "Sent",
                 BasicStatus::Verified => "Readback OK",
@@ -103,14 +105,8 @@ impl Presenter<'_> {
         };
         self.tr(key).into()
     }
-    fn advanced_status(&self, item: Item) -> String {
-        use crate::motor::settings::BlockId;
-        let start = matches!(item, Item::StartRead | Item::StartApply);
-        let id = if start {
-            BlockId::StartResponse
-        } else {
-            BlockId::AssistLimits
-        };
+    fn advanced_status(&self, id: BlockId) -> String {
+        let start = id == BlockId::StartResponse;
         let draft = if start {
             &self.model.start
         } else {
@@ -121,9 +117,7 @@ impl Presenter<'_> {
             && transfer.request_result != RequestResult::Accepted
         {
             Self::result(transfer.request_result)
-        } else if matches!(item, Item::AdvRead | Item::StartRead) && draft.dirty {
-            "Draft pending"
-        } else if item == Item::AdvApply && draft.dirty && transfer.state == TransferStatus::Ready {
+        } else if draft.dirty && transfer.state == TransferStatus::Ready {
             "Modified"
         } else if transfer.block_id != Some(id) {
             if draft.valid { "Loaded" } else { "Read first" }
@@ -144,6 +138,23 @@ impl Presenter<'_> {
             }
         };
         self.tr(key).into()
+    }
+    fn motor_page_status(&self) -> Option<String> {
+        let status = match self.model.navigation.page {
+            Page::Motor => self.basic_status(),
+            Page::Advanced | Page::Current | Page::Speed => {
+                self.advanced_status(BlockId::AssistLimits)
+            }
+            Page::Start => self.advanced_status(BlockId::StartResponse),
+            _ => return None,
+        };
+        Some(if self.model.motor_busy && !self.bike.active {
+            self.tr("CAN offline").into()
+        } else if !self.model.motor_busy && self.model.assist != 0 {
+            self.tr("Set assist 0").into()
+        } else {
+            status
+        })
     }
     fn menu_value(&self, item: Item) -> String {
         use Item::*;
@@ -216,8 +227,6 @@ impl Presenter<'_> {
                     "-- mm".into()
                 }
             }
-            Apply => self.basic_status(),
-            AdvRead | AdvApply | StartRead | StartApply => self.advanced_status(item),
             Start | Current | Speed => format!(
                 "{} {}",
                 s.levels,
@@ -226,19 +235,6 @@ impl Presenter<'_> {
                 } else {
                     "levels"
                 }
-            ),
-            AdvDiscard | StartDiscard => tr(
-                if (if item == StartDiscard {
-                    &self.model.start
-                } else {
-                    &self.model.limits
-                })
-                .dirty
-                {
-                    "Modified"
-                } else {
-                    ">"
-                },
             ),
             PowerMode => format!(
                 "{} {}",
@@ -485,7 +481,9 @@ impl UserInterface {
         } else if model.navigation.editing {
             p.tr("EDIT").into()
         } else if model.navigation.view == View::Menu {
-            format!("{} / {}", model.navigation.selected + 1, model.count()).into()
+            p.motor_page_status()
+                .unwrap_or_else(|| format!("{} / {}", model.navigation.selected + 1, model.count()))
+                .into()
         } else {
             "".into()
         });

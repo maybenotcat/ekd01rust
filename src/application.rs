@@ -30,6 +30,12 @@ use alloc::rc::Rc;
 use core::cell::RefCell;
 use embassy_executor::Spawner;
 
+#[derive(Clone, Copy)]
+enum MotorRead {
+    Basic,
+    Block(BlockId),
+}
+
 pub struct Application {
     pmu: Pmu,
     rtc: Rtc,
@@ -48,6 +54,7 @@ pub struct Application {
     last_clock: u32,
     save_pending: bool,
     sequence: u16,
+    pending_motor_read: Option<MotorRead>,
 }
 impl Application {
     pub async fn initialize(spawner: Spawner) -> Self {
@@ -99,12 +106,14 @@ impl Application {
             last_clock: now.wrapping_sub(128),
             save_pending: false,
             sequence: 0,
+            pending_motor_read: None,
         }
     }
     fn shutdown(&mut self, now: u32, wait_release: bool) {
         BluetoothControl::set_enabled(false);
         self.power.request(now, wait_release);
         self.motor.stop();
+        self.pending_motor_read = None;
         self.power_status("Powering off");
     }
     fn power_status(&self, text: &str) {
@@ -139,10 +148,13 @@ impl Application {
             });
         }
         if actions.contains(Actions::ADV_READ) {
-            self.motor.read_block(BlockId::AssistLimits, now);
+            self.pending_motor_read = Some(MotorRead::Block(BlockId::AssistLimits));
         }
         if actions.contains(Actions::START_READ) {
-            self.motor.read_block(BlockId::StartResponse, now);
+            self.pending_motor_read = Some(MotorRead::Block(BlockId::StartResponse));
+        }
+        if actions.contains(Actions::MOTOR_READ) {
+            self.pending_motor_read = Some(MotorRead::Basic);
         }
         if actions.contains(Actions::ADV_APPLY) {
             self.motor.apply_block(
@@ -180,9 +192,29 @@ impl Application {
         if actions.contains(Actions::SHUTDOWN) {
             self.shutdown(now, true);
         }
+        self.model.motor_busy = self.pending_motor_read.is_some() || self.motor.busy();
+    }
+    fn service_motor_read(&mut self, now: u32) {
+        // Page changes may happen during post-write verification. Defer reads
+        // until that transaction finishes instead of replacing or interleaving it.
+        if self.motor.busy() {
+            return;
+        }
+        if let Some(request) = self.pending_motor_read.take() {
+            match request {
+                MotorRead::Basic => {
+                    self.motor.read_basic(now);
+                }
+                MotorRead::Block(id) => {
+                    self.motor.read_block(id, now);
+                }
+            }
+        }
     }
     fn synchronize(&mut self, now: u32) {
         let bike = self.motor.status();
+        self.model.motor_busy = self.pending_motor_read.is_some() || self.motor.busy();
+        self.model.motor_online = bike.motor_online(now);
         let telemetry = &bike.telemetry;
         self.model
             .preferences
@@ -269,6 +301,8 @@ impl Application {
         loop {
             let now = Timer::now();
             self.motor.service(now, |code| self.buttons.mcu(code, now));
+            self.service_motor_read(now);
+            self.synchronize(now);
             if first_service {
                 DebugUart::log("[BIKE] FIRST_SERVICE_EXIT\n");
                 first_service = false;
@@ -299,7 +333,6 @@ impl Application {
                     break;
                 }
             }
-            self.synchronize(now);
             self.complete_shutdown(now);
             if self.power.state == PowerState::Running
                 && (actions.contains(Actions::REDRAW)

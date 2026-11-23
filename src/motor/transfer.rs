@@ -1,6 +1,6 @@
 //! Original stop-and-wait block transfer, including complete post-write readback.
 use super::settings::{BlockId, ParameterBlock, Snapshot};
-use crate::protocol::CanFrame;
+use crate::protocol::{CanFrame, motor_reply};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum TransferStatus {
@@ -89,6 +89,11 @@ impl BlockTransfer {
             return;
         }
         self.view.block_id = Some(id);
+        if id == BlockId::StartResponse {
+            self.view.start.valid = false;
+        } else {
+            self.view.limits.valid = false;
+        }
         self.verify = false;
         self.progress_reset(now);
         self.phase = Phase::ReadHeader;
@@ -132,10 +137,8 @@ impl BlockTransfer {
     }
     fn accept_block(&mut self) -> bool {
         let id = self.view.block_id.unwrap();
-        if !self.incoming.valid(id) {
-            self.finish(TransferStatus::BadBlock);
-            return false;
-        }
+        // N22 accepts the received block without checking byte 63. The checksum
+        // is generated when writing 6011; it is not a read acceptance criterion.
         let matches = self.incoming == self.outgoing;
         let snapshot = if id == BlockId::StartResponse {
             &mut self.view.start
@@ -163,9 +166,25 @@ impl BlockTransfer {
         let Some(id) = self.view.block_id else {
             return false;
         };
+        let Some((kind, command)) = motor_reply(frame.id) else {
+            return false;
+        };
+        // N22 restarts the receive assembly when the same block header arrives.
+        if matches!(self.phase, Phase::ReadHeader | Phase::ReadData)
+            && kind == 4 && command == id as u16
+        {
+            if frame.length == 0 || frame.data[0] != 64 {
+                self.finish(TransferStatus::BadBlock);
+                return false;
+            }
+            self.progress_reset(now);
+            self.phase = Phase::ReadData;
+            self.queue(0x03120000 | id as u32, &[]);
+            return true;
+        }
         match self.phase {
             Phase::WriteHeaderAck | Phase::WriteChunkAck | Phase::WriteFinalAck => {
-                if frame.id != (0x02fa0000 | id as u32) || frame.length != 0 {
+                if kind != 2 || command != id as u16 || frame.length != 0 {
                     return false;
                 }
                 self.activity = now;
@@ -180,30 +199,24 @@ impl BlockTransfer {
                 }
                 true
             }
-            Phase::ReadHeader => {
-                if frame.id != (0x02fc0000 | id as u32) {
-                    return false;
-                }
-                if frame.length != 1 || frame.data[0] != 64 {
-                    self.finish(TransferStatus::BadBlock);
-                    return false;
-                }
-                self.progress_reset(now);
-                self.phase = Phase::ReadData;
-                self.queue(0x03120000 | id as u32, &[]);
-                true
-            }
+            Phase::ReadHeader => false,
             Phase::ReadData => {
-                let kind = (frame.id >> 16) & 7;
-                if frame.id & 0xfff80000 != 0x02f80000 || !matches!(kind, 5 | 6) {
+                if !matches!(kind, 5 | 6) {
                     return false;
                 }
-                if frame.id & 0xffff != self.sequence || frame.length != 8 || self.bytes + 8 > 64 {
+                // Out-of-order packets are ignored in N22, not grounds for
+                // aborting a valid transfer. They do not extend our timeout.
+                if command as u32 != self.sequence {
+                    return false;
+                }
+                let length = frame.length as usize;
+                if !(1..=8).contains(&length) || self.bytes + length > 64 {
                     self.finish(TransferStatus::BadBlock);
                     return false;
                 }
-                self.incoming.bytes[self.bytes..self.bytes + 8].copy_from_slice(&frame.data);
-                self.bytes += 8;
+                self.incoming.bytes[self.bytes..self.bytes + length]
+                    .copy_from_slice(&frame.data[..length]);
+                self.bytes += length;
                 self.sequence += 1;
                 self.activity = now;
                 self.view.progress = self.bytes;

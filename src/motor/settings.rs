@@ -47,9 +47,6 @@ impl ParameterBlock {
             .iter()
             .fold(0u8, |sum, byte| sum.wrapping_add(*byte))
     }
-    pub fn valid(&self, id: BlockId) -> bool {
-        id == BlockId::StartResponse || self.checksum() == self.bytes[63]
-    }
     pub fn get(&self, parameter: Parameter, levels: u8, level: u8) -> Option<u8> {
         Some(self.bytes[parameter.offset(levels, level)?])
     }
