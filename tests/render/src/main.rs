@@ -87,11 +87,13 @@ fn main() {
     for scene in ["error", "menu"] {
         if scene == "menu" {
             dashboard.set_view(2);
-            dashboard.set_page_title("Экран".into());
+            dashboard.set_page_title("DISPLAY SETTING".into());
             dashboard.set_rows(std::rc::Rc::new(slint::VecModel::from(vec![
-                Row { label: "Единицы".into(), value: "км".into(), active: false },
-                Row { label: "Яркость".into(), value: "50%".into(), active: false },
-                Row { label: "Главный экран".into(), value: "Классическая".into(), active: true },
+                Row { label: "Units".into(), value: "km".into(), active: false },
+                Row { label: "Brightness".into(), value: "50%".into(), active: false },
+                Row { label: "Main screen".into(), value: "Classic".into(), active: true },
+                Row { label: "Auto Power Off".into(), value: "5 min".into(), active: false },
+                Row { label: "Trip Reset".into(), value: "".into(), active: false },
             ])).into());
         }
         assert!(window.draw_if_needed(|renderer| { renderer.render(&mut pixels, 320); }));

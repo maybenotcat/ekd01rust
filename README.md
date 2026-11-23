@@ -8,6 +8,12 @@ Uses Embassy, Slint, Trouble and littlefs_rust. The auxiliary MCU firmware is le
 
 Tested on a display that originally ran `EKD01_CAN_BF_N22`. This may matter for compatibility: the auxiliary MCU firmware is not updated, and devices running other firmware versions have not been tested.
 
+<p>
+  <img src="images/ekd01rust-theme-0-speed-25_3.png" alt="Main screen layout 1" width="32%">
+  <img src="images/ekd01rust-theme-1-speed-25_3.png" alt="Main screen layout 2" width="32%">
+  <img src="images/ekd01rust-menu-en.png" alt="Display settings menu in English" width="32%">
+</p>
+
 ## Build
 
 Install Rust through rustup. On Windows, install MSVC Build Tools and the Windows SDK.
