@@ -16,6 +16,7 @@ use slint::{
         software_renderer::{MinimalSoftwareWindow, RepaintBufferType, Rgb565Pixel},
     },
 };
+mod bindings;
 pub mod data;
 pub mod model;
 pub mod power_flow;
@@ -59,7 +60,8 @@ pub struct UserInterface {
     window: Rc<MinimalSoftwareWindow>,
     framebuffer: Box<Framebuffer>,
     display: Display,
-    rows: Rc<slint::VecModel<Row>>,
+    statistics: Rc<slint::VecModel<Statistic>>,
+    menu_items: Rc<slint::VecModel<MenuEntry>>,
     first_frame: bool,
 }
 impl UserInterface {
@@ -71,8 +73,10 @@ impl UserInterface {
         .expect("install Slint platform once");
         window.set_size(PhysicalSize::new(WIDTH as u32, HEIGHT as u32));
         let component = Dashboard::new()?;
-        let rows = Rc::new(slint::VecModel::default());
-        component.set_rows(rows.clone().into());
+        let statistics = Rc::new(slint::VecModel::default());
+        let menu_items = Rc::new(slint::VecModel::default());
+        component.set_statistics(statistics.clone().into());
+        component.set_menu_items(menu_items.clone().into());
         component.show()?;
         let framebuffer = Framebuffer::allocate();
         Ok(Self {
@@ -80,7 +84,8 @@ impl UserInterface {
             window,
             framebuffer,
             display,
-            rows,
+            statistics,
+            menu_items,
             first_frame: true,
         })
     }

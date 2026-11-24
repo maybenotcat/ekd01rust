@@ -1,0 +1,20 @@
+export component SummaryCard inherits Rectangle {
+    in property <string> caption;
+    in property <string> value;
+    background: #1c2939;
+    border-radius: 6px;
+    Text { x: 8px; y: 4px; width: parent.width - 16px; height: 18px; text: root.caption; color: white; font-size: 14px; horizontal-alignment: center; }
+    Text { x: 8px; y: 22px; width: parent.width - 16px; height: 20px; text: root.value; color: white; font-size: 18px; horizontal-alignment: center; }
+}
+
+export component PageFrame inherits Rectangle {
+    width: 320px;
+    height: 240px;
+    in property <string> title;
+    in property <string> status;
+    in property <bool> status-error;
+    background: #0b1220;
+    Text { x: 10px; y: 7px; width: 300px; height: 25px; text: root.title; color: white; font-size: 19px; }
+    @children
+    Text { x: 8px; y: 219px; width: 304px; height: 18px; text: root.status; color: root.status-error ? #ff6868 : white; font-size: 13px; }
+}

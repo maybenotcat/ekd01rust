@@ -1,0 +1,48 @@
+import { UiText } from "text.slint";
+import { PageFrame } from "components.slint";
+import { MenuEntry, MenuItem, MenuPage, ValueKind } from "types.slint";
+import { MenuText } from "menu-labels.slint";
+import "../assets/NotoSans-Regular.ttf";
+
+component SettingRow inherits Rectangle {
+    in property <string> label;
+    in property <string> value;
+    in property <bool> selected;
+    width: 304px;
+    height: 34px;
+    background: root.selected ? #24475b : #1c2939;
+    border-radius: 5px;
+    Text { x: 8px; width: 179px; height: parent.height; text: root.label; color: white; font-size: 14px; vertical-alignment: center; }
+    Text { x: 188px; width: 108px; height: parent.height; text: root.value; color: white; font-size: 14px; horizontal-alignment: right; vertical-alignment: center; }
+}
+
+export component SettingsPage inherits PageFrame {
+    // Standalone preview; runtime supplies the complete page and selection.
+    in property <MenuPage> page: MenuPage.display;
+    in property <bool> russian;
+    in property <bool> imperial;
+    in property <[MenuEntry]> items: [
+        { kind: MenuItem.units, value: { kind: ValueKind.distance-unit } },
+        { kind: MenuItem.brightness, value: { kind: ValueKind.percent, whole: 50, available: true } },
+        { kind: MenuItem.theme, value: { kind: ValueKind.theme, flag: true } },
+        { kind: MenuItem.auto-off, value: { kind: ValueKind.minutes, whole: 5, available: true } },
+        { kind: MenuItem.trip, value: { kind: ValueKind.distance-hundredths, whole: 12, fraction: 34, available: true } },
+        { kind: MenuItem.hour, value: { kind: ValueKind.clock, whole: 12, fraction: 34, available: true } },
+        { kind: MenuItem.minute, value: { kind: ValueKind.clock, whole: 12, fraction: 34, available: true } },
+        { kind: MenuItem.language, value: { kind: ValueKind.language, flag: false } },
+        { kind: MenuItem.service, value: { kind: ValueKind.navigation } },
+        { kind: MenuItem.back, value: { kind: ValueKind.navigation } },
+    ];
+    in property <int> selected: 2;
+    private property <int> rows-per-page: 5;
+    private property <int> first-visible: floor(root.selected / root.rows-per-page) * root.rows-per-page;
+    title: MenuText.title(root.page, root.russian);
+    for entry[index] in root.items: SettingRow {
+        visible: index >= root.first-visible && index < root.first-visible + root.rows-per-page;
+        x: 8px;
+        y: 36px + (index - root.first-visible) * 36px;
+        label: MenuText.label(entry.kind, root.russian);
+        value: UiText.value(entry.value, root.russian, root.imperial);
+        selected: index == root.selected;
+    }
+}

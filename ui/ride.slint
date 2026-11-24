@@ -1,0 +1,26 @@
+import { PageFrame, SummaryCard } from "components.slint";
+import { Statistic, StatisticKind, ValueKind } from "types.slint";
+import { UiText } from "text.slint";
+import "../assets/NotoSans-Regular.ttf";
+
+export component RidePage inherits PageFrame {
+    in property <bool> russian;
+    in property <bool> imperial;
+    title: UiText.ride-title(root.russian);
+    in property <[Statistic]> statistics: [
+        { kind: StatisticKind.trip, value: { kind: ValueKind.distance-hundredths, whole: 12, fraction: 34, available: true } },
+        { kind: StatisticKind.range, value: { kind: ValueKind.distance-tenths, whole: 65, fraction: 0, available: true } },
+        { kind: StatisticKind.cadence, value: { kind: ValueKind.cadence, whole: 72, available: true } },
+        { kind: StatisticKind.battery, value: { kind: ValueKind.percent, whole: 78, available: true } },
+        { kind: StatisticKind.motor, value: { kind: ValueKind.temperature, whole: 35, available: true } },
+        { kind: StatisticKind.controller, value: { kind: ValueKind.temperature, whole: 30, available: true } },
+    ];
+    for entry[index] in root.statistics: SummaryCard {
+        x: 8px + mod(index, 2) * 156px;
+        y: 36px + floor(index / 2) * 65px;
+        width: 148px;
+        height: 58px;
+        caption: UiText.caption(entry.kind, root.russian);
+        value: UiText.value(entry.value, root.russian, root.imperial);
+    }
+}

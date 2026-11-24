@@ -21,7 +21,7 @@ use crate::{
     },
     storage::{FlashBus, SettingsStore},
     ui::{
-        UserInterface,
+        StatusCode, UserInterface,
         model::{Actions, UiModel},
         power_flow::{PowerFlow, PowerState},
         presentation::DeviceInfo,
@@ -118,12 +118,13 @@ impl Application {
         self.power.request(now, wait_release);
         self.motor.stop();
         self.pending_motor_read = None;
-        self.power_status("Powering off");
+        self.power_status(StatusCode::PoweringOff);
     }
-    fn power_status(&self, text: &str) {
-        self.ui.component.set_status(
-            crate::ui::data::translate(text, self.model.preferences.settings.language != 0).into(),
-        );
+    fn power_status(&self, code: StatusCode) {
+        self.ui
+            .component
+            .set_russian(self.model.preferences.settings.language != 0);
+        self.ui.component.set_status_code(code);
     }
     fn actions(&mut self, actions: Actions, now: u32) {
         let model = &mut self.model;
@@ -291,12 +292,12 @@ impl Application {
         let saved = self.save();
         self.power.save_finished(saved);
         if !saved {
-            self.power_status("Settings save failed");
+            self.power_status(StatusCode::SettingsSaveFailed);
             return;
         }
         if !self.rtc.release_power() {
             self.power.state = PowerState::ReleaseFailed;
-            self.power_status("Power control error");
+            self.power_status(StatusCode::PowerControlError);
             return;
         }
         self.backlight.off();
@@ -325,7 +326,7 @@ impl Application {
                     self.last_activity = now;
                 }
                 if self.power.retry(now, keys.short & 4 != 0) {
-                    self.power_status("Powering off");
+                    self.power_status(StatusCode::PoweringOff);
                 }
                 let action = if self.power.state == PowerState::Running {
                     self.model.step(keys, now)

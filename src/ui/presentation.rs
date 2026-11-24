@@ -1,6 +1,7 @@
 use super::{
-    Row, UserInterface,
-    data::{Item, translate},
+    CounterValue, DashboardData, DiagnosticsData, DisplayValue, InformationData, MenuEntry,
+    Statistic, StatisticKind, StatusCode, UserInterface, ValueKind,
+    data::Item,
     model::{Page, UiModel, View},
 };
 use crate::{
@@ -11,11 +12,7 @@ use crate::{
         transfer::{RequestResult, TransferStatus},
     },
 };
-use alloc::{
-    format,
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::vec::Vec;
 use slint::Model;
 
 pub struct DeviceInfo {
@@ -29,17 +26,44 @@ struct Presenter<'a> {
     device: &'a DeviceInfo,
     now: u32,
 }
+impl DisplayValue {
+    fn number(kind: ValueKind, whole: i32) -> Self {
+        Self {
+            kind,
+            whole,
+            available: true,
+            ..Self::default()
+        }
+    }
+    fn decimal(kind: ValueKind, whole: i32, fraction: i32) -> Self {
+        Self {
+            fraction,
+            ..Self::number(kind, whole)
+        }
+    }
+    fn missing(kind: ValueKind) -> Self {
+        Self {
+            kind,
+            ..Self::default()
+        }
+    }
+    fn option(kind: ValueKind, flag: bool) -> Self {
+        Self {
+            kind,
+            flag,
+            ..Self::default()
+        }
+    }
+}
+impl From<u32> for CounterValue {
+    fn from(value: u32) -> Self {
+        Self {
+            upper: (value / 10_000) as i32,
+            lower: (value % 10_000) as i32,
+        }
+    }
+}
 impl Presenter<'_> {
-    fn tr<'a>(&self, key: &'a str) -> &'a str {
-        translate(key, self.model.preferences.settings.language != 0)
-    }
-    fn unit(&self) -> &str {
-        self.tr(if self.model.preferences.settings.imperial {
-            "mi"
-        } else {
-            "km"
-        })
-    }
     fn distance(&self, metric: u32) -> u32 {
         if self.model.preferences.settings.imperial {
             (metric as u64 * 621371 / 1000000) as u32
@@ -47,240 +71,197 @@ impl Presenter<'_> {
             metric
         }
     }
-    fn trip(&self) -> String {
+    fn trip(&self) -> DisplayValue {
         let value = self.distance(self.bike.telemetry.trip_m);
-        format!("{}.{:02} {}", value / 1000, value % 1000 / 10, self.unit())
+        DisplayValue::decimal(
+            ValueKind::DistanceHundredths,
+            (value / 1000) as i32,
+            (value % 1000 / 10) as i32,
+        )
     }
-    fn voltage(&self) -> String {
+    fn voltage(&self) -> DisplayValue {
         let value = if self.bike.telemetry.electric_fresh(self.now) {
             self.bike.telemetry.voltage as u32
         } else if self.bike.voltage_fresh(self.now) {
             self.bike.mcu_voltage_mv / 10
         } else {
-            return "--.- V".into();
+            return DisplayValue::missing(ValueKind::Voltage);
         };
-        format!("{}.{} V", value / 100, value / 10 % 10)
+        DisplayValue::decimal(
+            ValueKind::Voltage,
+            (value / 100) as i32,
+            (value / 10 % 10) as i32,
+        )
     }
-    fn battery(&self) -> String {
+    fn battery(&self) -> DisplayValue {
         let t = &self.bike.telemetry;
         if t.ride_fresh(self.now) && t.battery <= 100 {
-            format!("{}%", t.battery)
+            DisplayValue::number(ValueKind::Percent, t.battery as i32)
         } else {
-            "--%".into()
+            DisplayValue::missing(ValueKind::Percent)
         }
     }
-    fn row(&self, label: &str, value: String, active: bool) -> Row {
-        Row {
-            label: self.tr(label).into(),
-            value: value.into(),
-            active,
-        }
-    }
-    fn result(result: RequestResult) -> &'static str {
+    fn result(result: RequestResult) -> StatusCode {
         match result {
-            RequestResult::Accepted => "Apply",
-            RequestResult::Busy => "Busy",
-            RequestResult::Offline => "CAN offline",
-            RequestResult::NeedsNeutral => "Set assist 0",
-            RequestResult::Invalid => "Set values",
+            RequestResult::Accepted => StatusCode::Apply,
+            RequestResult::Busy => StatusCode::Busy,
+            RequestResult::Offline => StatusCode::Offline,
+            RequestResult::NeedsNeutral => StatusCode::Neutral,
+            RequestResult::Invalid => StatusCode::Invalid,
         }
     }
-    fn basic_status(&self) -> String {
-        let key = if self.bike.basic_result != RequestResult::Accepted {
-            Self::result(self.bike.basic_result)
-        } else {
-            match self.bike.basic_state {
-                BasicStatus::Idle => "Apply",
-                BasicStatus::Reading => "Reading",
-                BasicStatus::Loaded => "Loaded",
-                BasicStatus::Queued => "Queued",
-                BasicStatus::Sent => "Sent",
-                BasicStatus::Verified => "Readback OK",
-                BasicStatus::Timeout => "No reply",
-                BasicStatus::BadValues => "Set values",
-                BasicStatus::Offline => "CAN offline",
-                BasicStatus::Busy => "Busy",
-                BasicStatus::Neutral => "Set assist 0",
-            }
-        };
-        self.tr(key).into()
+    fn basic_status(&self) -> StatusCode {
+        if self.bike.basic_result != RequestResult::Accepted {
+            return Self::result(self.bike.basic_result);
+        }
+        match self.bike.basic_state {
+            BasicStatus::Idle => StatusCode::Apply,
+            BasicStatus::Reading => StatusCode::Reading,
+            BasicStatus::Loaded => StatusCode::Loaded,
+            BasicStatus::Queued => StatusCode::Queued,
+            BasicStatus::Sent => StatusCode::Sent,
+            BasicStatus::Verified => StatusCode::ReadbackOk,
+            BasicStatus::Timeout => StatusCode::Timeout,
+            BasicStatus::BadValues => StatusCode::Invalid,
+            BasicStatus::Offline => StatusCode::Offline,
+            BasicStatus::Busy => StatusCode::Busy,
+            BasicStatus::Neutral => StatusCode::Neutral,
+        }
     }
-    fn advanced_status(&self, id: BlockId) -> String {
-        let start = id == BlockId::StartResponse;
-        let draft = if start {
+    fn advanced_status(&self, id: BlockId) -> StatusCode {
+        let draft = if id == BlockId::StartResponse {
             &self.model.start
         } else {
             &self.model.limits
         };
         let transfer = &self.bike.advanced;
-        let key = if transfer.requested_block == Some(id)
+        if transfer.requested_block == Some(id)
             && transfer.request_result != RequestResult::Accepted
         {
-            Self::result(transfer.request_result)
-        } else if draft.dirty && transfer.state == TransferStatus::Ready {
-            "Modified"
-        } else if transfer.block_id != Some(id) {
-            if draft.valid { "Loaded" } else { "Read first" }
-        } else {
-            match transfer.state {
-                TransferStatus::Idle => "Read first",
-                TransferStatus::Reading => "Reading",
-                TransferStatus::Ready => "Loaded",
-                TransferStatus::Writing => "Writing",
-                TransferStatus::Verifying => "Verifying",
-                TransferStatus::Verified => "Verified",
-                TransferStatus::Timeout => "No reply",
-                TransferStatus::BadBlock => "Bad block",
-                TransferStatus::Mismatch => "Mismatch",
-                TransferStatus::Offline => "CAN offline",
-                TransferStatus::Neutral => "Set assist 0",
-                TransferStatus::Busy => "Busy",
-            }
-        };
-        self.tr(key).into()
+            return Self::result(transfer.request_result);
+        }
+        if draft.dirty && transfer.state == TransferStatus::Ready {
+            return StatusCode::Modified;
+        }
+        if transfer.block_id != Some(id) {
+            return if draft.valid {
+                StatusCode::Loaded
+            } else {
+                StatusCode::ReadFirst
+            };
+        }
+        match transfer.state {
+            TransferStatus::Idle => StatusCode::ReadFirst,
+            TransferStatus::Reading => StatusCode::Reading,
+            TransferStatus::Ready => StatusCode::Loaded,
+            TransferStatus::Writing => StatusCode::Writing,
+            TransferStatus::Verifying => StatusCode::Verifying,
+            TransferStatus::Verified => StatusCode::Verified,
+            TransferStatus::Timeout => StatusCode::Timeout,
+            TransferStatus::BadBlock => StatusCode::BadBlock,
+            TransferStatus::Mismatch => StatusCode::Mismatch,
+            TransferStatus::Offline => StatusCode::Offline,
+            TransferStatus::Neutral => StatusCode::Neutral,
+            TransferStatus::Busy => StatusCode::Busy,
+        }
     }
-    fn motor_page_status(&self) -> Option<String> {
+    fn motor_page_status(&self) -> StatusCode {
         let status = match self.model.navigation.page {
             Page::Motor => self.basic_status(),
             Page::Advanced | Page::Current | Page::Speed => {
                 self.advanced_status(BlockId::AssistLimits)
             }
             Page::Start => self.advanced_status(BlockId::StartResponse),
-            _ => return None,
+            _ => return StatusCode::None,
         };
-        Some(if self.model.motor_busy && !self.bike.active {
-            self.tr("CAN offline").into()
+        if self.model.motor_busy && !self.bike.active {
+            StatusCode::Offline
         } else if !self.model.motor_busy && self.model.assist != 0 {
-            self.tr("Set assist 0").into()
+            StatusCode::Neutral
         } else {
             status
-        })
+        }
     }
-    fn menu_value(&self, item: Item) -> String {
+    fn menu_value(&self, item: Item) -> DisplayValue {
         use Item::*;
         let s = &self.model.preferences.settings;
         let d = &self.model.basic;
-        let tr = |key| self.tr(key).to_string();
         match item {
-            Theme => tr(match s.theme {
-                crate::preferences::DashboardTheme::Standard => "Standard",
-                crate::preferences::DashboardTheme::Classic => "Classic",
-            }),
-            Brightness => format!(
-                "{}%",
-                [10, 30, 50, 75, 100][s.brightness.saturating_sub(1).min(4) as usize]
+            Theme => DisplayValue::option(
+                ValueKind::Theme,
+                s.theme == crate::preferences::DashboardTheme::Classic,
             ),
-            Units => self.unit().into(),
-            Bluetooth => tr(if s.bluetooth { "On" } else { "Off" }),
-            AutoOff => {
-                if s.auto_off_minutes == 0 {
-                    tr("Off")
-                } else {
-                    format!(
-                        "{} {}",
-                        s.auto_off_minutes,
-                        if s.language != 0 { "мин" } else { "min" }
-                    )
-                }
-            }
-            Hour | Minute => {
-                if self.model.clock_valid {
-                    format!("{:02}:{:02}", self.model.hour, self.model.minute)
-                } else {
-                    "--:--".into()
-                }
-            }
-            Language => if s.language != 0 {
-                "Русский"
-            } else {
-                "English"
-            }
-            .into(),
-            Levels => format!("{}", s.levels),
-            Limit => {
-                if d.valid & 1 != 0 {
-                    format!(
-                        "{}.{} {}",
-                        d.limit_x10 / 10,
-                        d.limit_x10 % 10,
-                        self.tr("km/h")
-                    )
-                } else {
-                    format!("-- {}", self.tr("km/h"))
-                }
-            }
-            Wheel => {
-                if d.valid & 2 != 0 {
-                    format!("{}.{} in", d.wheel / 10, d.wheel % 10)
-                } else {
-                    "-- in".into()
-                }
-            }
-            Circumference => {
-                if d.valid & 4 != 0 {
-                    format!(
-                        "{} {}",
-                        d.circumference,
-                        if s.language != 0 { "мм" } else { "mm" }
-                    )
-                } else {
-                    "-- mm".into()
-                }
-            }
-            Start | Current | Speed => format!(
-                "{} {}",
-                s.levels,
-                if s.language != 0 {
-                    "уровней"
-                } else {
-                    "levels"
-                }
+            Brightness => DisplayValue::number(
+                ValueKind::Percent,
+                [10, 30, 50, 75, 100][s.brightness.saturating_sub(1).min(4) as usize],
             ),
-            PowerMode => format!(
-                "{} {}",
-                if s.language != 0 {
-                    "Режим"
-                } else {
-                    "Mode"
-                },
-                s.power_mode + 1
-            ),
+            Units => DisplayValue::missing(ValueKind::DistanceUnit),
+            Bluetooth => DisplayValue::option(ValueKind::Toggle, s.bluetooth),
+            AutoOff => DisplayValue::number(ValueKind::Minutes, s.auto_off_minutes as i32),
+            Hour | Minute => DisplayValue {
+                available: self.model.clock_valid,
+                ..DisplayValue::decimal(
+                    ValueKind::Clock,
+                    self.model.hour as i32,
+                    self.model.minute as i32,
+                )
+            },
+            Language => DisplayValue::option(ValueKind::Language, s.language != 0),
+            Levels => DisplayValue::number(ValueKind::Number, s.levels as i32),
+            Limit => DisplayValue {
+                available: d.valid & 1 != 0,
+                ..DisplayValue::decimal(
+                    ValueKind::MetricSpeed,
+                    (d.limit_x10 / 10) as i32,
+                    (d.limit_x10 % 10) as i32,
+                )
+            },
+            Wheel => DisplayValue {
+                available: d.valid & 2 != 0,
+                ..DisplayValue::decimal(
+                    ValueKind::Wheel,
+                    (d.wheel / 10) as i32,
+                    (d.wheel % 10) as i32,
+                )
+            },
+            Circumference => DisplayValue {
+                available: d.valid & 4 != 0,
+                ..DisplayValue::number(ValueKind::Millimetres, d.circumference as i32)
+            },
+            Start | Current | Speed => DisplayValue::number(ValueKind::Levels, s.levels as i32),
+            PowerMode => DisplayValue::number(ValueKind::Mode, s.power_mode as i32 + 1),
             ServiceInterval => {
                 if s.service_interval_km == 0 {
-                    tr("Off")
+                    DisplayValue::option(ValueKind::Toggle, false)
                 } else {
-                    format!("{} {}", s.service_interval_km, self.tr("km"))
+                    DisplayValue::number(ValueKind::Kilometres, s.service_interval_km as i32)
                 }
             }
-            ServiceDistance => format!(
-                "{} {}",
-                self.model.preferences.since_service_m / 1000,
-                self.tr("km")
-            ),
-            Odometer => format!(
-                "{} {}",
-                self.model.preferences.odometer_m / 1000,
-                self.tr("km")
+            ServiceDistance | Odometer => DisplayValue::number(
+                ValueKind::Kilometres,
+                (if item == Odometer {
+                    self.model.preferences.odometer_m
+                } else {
+                    self.model.preferences.since_service_m
+                } / 1000) as i32,
             ),
             Trip | FactoryReset | ServiceReset | ErrorClear => {
                 if self.model.navigation.editing
                     && self.model.item(self.model.navigation.selected) == item
                 {
-                    tr(if self.model.navigation.confirm_reset {
-                        "Yes"
-                    } else {
-                        "No"
-                    })
+                    DisplayValue::option(
+                        ValueKind::Confirmation,
+                        self.model.navigation.confirm_reset,
+                    )
                 } else if item == Trip {
                     self.trip()
                 } else if item == ServiceReset {
-                    format!(
-                        "{} {}",
-                        self.model.preferences.since_service_m / 1000,
-                        self.tr("km")
+                    DisplayValue::number(
+                        ValueKind::Kilometres,
+                        (self.model.preferences.since_service_m / 1000) as i32,
                     )
                 } else {
-                    ">".into()
+                    DisplayValue::missing(ValueKind::Navigation)
                 }
             }
             _ => {
@@ -297,168 +278,180 @@ impl Presenter<'_> {
                         &self.model.limits
                     };
                     if !draft.valid {
-                        return "--".into();
+                        return DisplayValue::missing(ValueKind::Unavailable);
                     }
                     let value = draft
                         .block
                         .get(parameter, s.levels, index as u8 + 1)
                         .unwrap_or(0);
-                    if parameter == Parameter::Start {
-                        format!("{value} / 8")
-                    } else {
-                        format!("{value}%")
-                    }
+                    DisplayValue::number(
+                        if parameter == Parameter::Start {
+                            ValueKind::StartResponse
+                        } else {
+                            ValueKind::Percent
+                        },
+                        value as i32,
+                    )
                 } else {
-                    ">".into()
+                    DisplayValue::missing(ValueKind::Navigation)
                 }
             }
         }
     }
-    fn menu_rows(&self) -> Vec<Row> {
-        let first = self.model.navigation.selected / 5 * 5;
-        (first..(first + 5).min(self.model.count()))
+    fn menu_entries(&self) -> Vec<MenuEntry> {
+        (0..self.model.count())
             .map(|index| {
                 let item = self.model.item(index);
-                self.row(
-                    item.label(),
-                    self.menu_value(item),
-                    index == self.model.navigation.selected,
-                )
+                MenuEntry {
+                    kind: item.into(),
+                    value: self.menu_value(item),
+                }
             })
             .collect()
     }
-    fn ride_rows(&self) -> Vec<Row> {
+    fn ride_rows(&self) -> Vec<Statistic> {
         let t = &self.bike.telemetry;
         let range = self.distance(t.range as u32);
         let ride = t.ride_fresh(self.now);
         let electric = t.electric_fresh(self.now);
-        let range = if ride {
-            format!("{}.{} {}", range / 100, range / 10 % 10, self.unit())
-        } else {
-            "--".into()
-        };
-        let rpm = if self.model.preferences.settings.language != 0 {
-            "об/мин"
-        } else {
-            "rpm"
-        };
-        let cadence = if ride {
-            format!("{} {rpm}", t.cadence)
-        } else {
-            format!("-- {rpm}")
-        };
-        let temperature = |value| {
-            if electric {
-                format!("{value} C")
-            } else {
-                "-- C".into()
-            }
-        };
         [
-            ("TRIP", self.trip()),
-            ("RANGE", range),
-            ("CADENCE", cadence),
-            ("BATTERY", self.battery()),
-            ("MOTOR", temperature(t.motor_c)),
-            ("CONTROLLER", temperature(t.controller_c)),
-        ]
-        .into_iter()
-        .map(|(label, value)| self.row(label, value, false))
-        .collect()
-    }
-    fn information(&self) -> String {
-        use Item::*;
-        let t = &self.bike.telemetry;
-        let ru = self.model.preferences.settings.language != 0;
-        match self.model.navigation.info_page.unwrap_or(BatteryInfo) {
-            BatteryInfo => format!(
-                "{}  {}\nSOC  {}",
-                if ru {
-                    "Напряжение"
-                } else {
-                    "Total voltage"
-                },
-                self.voltage(),
-                self.battery()
-            ),
-            CtrlInfo => {
-                if t.valid & 4 != 0 {
-                    format!(
-                        "{}  {}.{:02} {}\n{}  {}.{} in\n{}  {} mm\nCAN RX  {}\n{}  --",
-                        self.tr("Speed Limit"),
-                        t.limit / 100,
-                        t.limit % 100,
-                        self.tr("km/h"),
-                        self.tr("Wheel Size"),
-                        t.wheel / 10,
-                        t.wheel % 10,
-                        self.tr("Wheel Length"),
-                        t.circumference,
-                        self.bike.rx,
-                        if ru {
-                            "Серийный номер / версия"
-                        } else {
-                            "Serial / version"
-                        }
+            (StatisticKind::Trip, self.trip()),
+            (
+                StatisticKind::Range,
+                if ride {
+                    DisplayValue::decimal(
+                        ValueKind::DistanceTenths,
+                        (range / 100) as i32,
+                        (range / 10 % 10) as i32,
                     )
                 } else {
-                    if ru {
-                        "Ожидание данных контроллера"
-                    } else {
-                        "Waiting for controller data"
-                    }
-                    .into()
-                }
-            }
-            DisplayInfo => format!(
-                "LCD  320x240\nFLASH  {:06X} / 8 MiB\nPSRAM  8 MiB\nMCU  {:02X?}\n{:02}:{:02}",
-                self.device.jedec, self.bike.mcu_version, self.model.hour, self.model.minute
+                    DisplayValue::missing(ValueKind::Unavailable)
+                },
             ),
-            TorqueInfo => if ru {
-                "Нет данных датчика момента\nСерийный номер / версия  --"
+            (
+                StatisticKind::Cadence,
+                DisplayValue {
+                    available: ride,
+                    ..DisplayValue::number(ValueKind::Cadence, t.cadence as i32)
+                },
+            ),
+            (StatisticKind::Battery, self.battery()),
+            (
+                StatisticKind::Motor,
+                DisplayValue {
+                    available: electric,
+                    ..DisplayValue::number(ValueKind::Temperature, t.motor_c as i32)
+                },
+            ),
+            (
+                StatisticKind::Controller,
+                DisplayValue {
+                    available: electric,
+                    ..DisplayValue::number(ValueKind::Temperature, t.controller_c as i32)
+                },
+            ),
+        ]
+        .into_iter()
+        .map(|(kind, value)| Statistic { kind, value })
+        .collect()
+    }
+    fn dashboard(&self) -> DashboardData {
+        let t = &self.bike.telemetry;
+        let odometer = self.distance(self.model.preferences.odometer_m);
+        let s = &self.model.preferences.settings;
+        DashboardData {
+            speed_tenths: (self.distance(t.speed as u32) / 10) as i32,
+            speed_available: t.electric_fresh(self.now),
+            classic_speed_fill: if t.electric_fresh(self.now) {
+                (t.speed as u32 / 75).min(100) as i32
             } else {
-                "No torque sensor data\nSerial / version  --"
-            }
-            .into(),
-            Errors => {
-                let count = self
-                    .model
-                    .preferences
-                    .errors
-                    .iter()
-                    .take_while(|value| **value != 0)
-                    .count();
-                if count == 0 {
-                    return self.tr("No recorded errors").into();
-                }
-                let index = self.model.navigation.error_page % count;
-                let error = self.model.preferences.errors[index];
-                format!(
-                    "{} {:02X}\n{} {} / cmd {:02X}:{}\n{} / {}",
-                    if ru { "Ошибка" } else { "Error" },
-                    error & 255,
-                    if ru { "Источник" } else { "Source" },
-                    error >> 24,
-                    (error >> 8) & 255,
-                    (error >> 16) & 255,
-                    index + 1,
-                    count
+                0
+            },
+            power: DisplayValue {
+                available: t.electric_fresh(self.now),
+                ..DisplayValue::number(
+                    ValueKind::Power,
+                    (t.voltage as i64 * t.current as i64 / 10000) as i32,
                 )
-            }
-            _ => self.tr("Unavailable").into(),
+            },
+            voltage: self.voltage(),
+            battery: self.battery(),
+            trip: self.trip(),
+            odometer: DisplayValue::decimal(
+                ValueKind::DistanceTenths,
+                (odometer / 1000) as i32,
+                (odometer % 1000 / 100) as i32,
+            ),
+            assist: self.model.assist as i32,
+            lights: self.model.lights,
+            bluetooth: self.device.bluetooth as i32,
+            fault: t.error != 0,
+            error_code: (t.error & 255) as i32,
+            service_due: s.service_interval_km != 0
+                && self.model.preferences.since_service_m / 1000 >= s.service_interval_km,
+        }
+    }
+    fn information(&self) -> InformationData {
+        let t = &self.bike.telemetry;
+        let errors = &self.model.preferences.errors;
+        let count = errors.iter().take_while(|value| **value != 0).count();
+        let index = if count == 0 {
+            0
+        } else {
+            self.model.navigation.error_page % count
+        };
+        let error = if count == 0 { 0 } else { errors[index] };
+        let version = self.bike.mcu_version;
+        InformationData {
+            voltage: self.voltage(),
+            battery: self.battery(),
+            controller_available: t.valid & 4 != 0,
+            limit: t.limit as i32,
+            wheel: t.wheel as i32,
+            circumference: t.circumference as i32,
+            can_rx: self.bike.rx.into(),
+            flash_jedec: self.device.jedec as i32,
+            mcu0: version[0] as i32,
+            mcu1: version[1] as i32,
+            mcu2: version[2] as i32,
+            mcu3: version[3] as i32,
+            mcu4: version[4] as i32,
+            hour: self.model.hour as i32,
+            minute: self.model.minute as i32,
+            error_count: count as i32,
+            error_position: index as i32 + 1,
+            error_code: (error & 255) as i32,
+            error_source: (error >> 24) as i32,
+            error_command: ((error >> 8) & 255) as i32,
+            error_subcommand: ((error >> 16) & 255) as i32,
+        }
+    }
+    fn diagnostics(&self) -> DiagnosticsData {
+        DiagnosticsData {
+            flash_writable: self.device.flash_writable,
+            flash_jedec: self.device.jedec as i32,
+            can_rx: self.bike.rx.into(),
+            can_tx: self.bike.tx.into(),
+            mcu_rx: self.bike.mcu_rx.into(),
+            adc_mv: self.bike.mcu_voltage_mv.into(),
+            adc_fresh: self.bike.voltage_fresh(self.now),
+            uart_errors: self.bike.uart_errors.into(),
+            bad_frames: self.bike.malformed.into(),
+            last_can_high: (self.bike.last_id >> 16) as i32,
+            last_can_low: (self.bike.last_id & 0xffff) as i32,
         }
     }
 }
 
 impl UserInterface {
-    fn replace_rows(&self, rows: Vec<Row>) {
-        if self.rows.row_count() != rows.len() {
-            self.rows.set_vec(rows);
+    fn update_model<T: Clone + PartialEq + 'static>(model: &slint::VecModel<T>, values: Vec<T>) {
+        if model.row_count() != values.len() {
+            model.set_vec(values);
             return;
         }
-        for (index, row) in rows.into_iter().enumerate() {
-            if self.rows.row_data(index).as_ref() != Some(&row) {
-                self.rows.set_row_data(index, row);
+        for (index, value) in values.into_iter().enumerate() {
+            if model.row_data(index).as_ref() != Some(&value) {
+                model.set_row_data(index, value);
             }
         }
     }
@@ -469,178 +462,45 @@ impl UserInterface {
             device,
             now,
         };
-        let t = &bike.telemetry;
         let c = &self.component;
-        c.set_view(model.navigation.view as i32);
+        c.set_view(model.navigation.view.into());
+        c.set_russian(model.preferences.settings.language != 0);
+        c.set_imperial(model.preferences.settings.imperial);
         c.set_theme(model.preferences.settings.theme as i32);
         c.set_status_error(model.save_error);
-        c.set_status(if model.navigation.view == View::Dashboard {
-            "".into()
+        c.set_status_code(if model.navigation.view == View::Dashboard {
+            StatusCode::None
         } else if model.save_error {
-            p.tr("Save error").into()
+            StatusCode::SaveError
         } else if model.navigation.editing {
-            p.tr("EDIT").into()
+            StatusCode::Edit
         } else if model.navigation.view == View::Menu {
-            p.motor_page_status()
-                .unwrap_or_else(|| format!("{} / {}", model.navigation.selected + 1, model.count()))
-                .into()
+            match p.motor_page_status() {
+                StatusCode::None => StatusCode::PagePosition,
+                code => code,
+            }
         } else {
-            "".into()
+            StatusCode::None
         });
         match model.navigation.view {
-            View::Dashboard => {
-                c.set_bluetooth(device.bluetooth as i32);
-                c.set_lights(model.lights);
-                c.set_lights_text(p.tr("LIGHT").into());
-                c.set_assist_caption(p.tr("ASSIST").into());
-                c.set_assist_text(
-                    format!("{} / {}", model.assist, model.preferences.settings.levels).into(),
-                );
-                c.set_assist_level(model.assist as i32);
-                let odometer = p.distance(model.preferences.odometer_m);
-                c.set_odometer_text(
-                    format!(
-                        "{}.{:01} {}",
-                        odometer / 1000,
-                        odometer % 1000 / 100,
-                        p.unit()
-                    )
-                    .into(),
-                );
-                c.set_classic_speed_max(
-                    if model.preferences.settings.imperial {
-                        "47"
-                    } else {
-                        "75"
-                    }
-                    .into(),
-                );
-                c.set_classic_speed_mid(
-                    if model.preferences.settings.imperial {
-                        "31"
-                    } else {
-                        "50"
-                    }
-                    .into(),
-                );
-                c.set_voltage(p.voltage().into());
-                c.set_trip_caption(p.tr("TRIP").into());
-                c.set_trip_text(p.trip().into());
-                c.set_battery_text(p.battery().into());
-                c.set_battery(if t.ride_fresh(now) && t.battery <= 100 {
-                    t.battery as i32
-                } else {
-                    0
-                });
-                c.set_speed_unit(
-                    p.tr(if model.preferences.settings.imperial {
-                        "mph"
-                    } else {
-                        "km/h"
-                    })
-                    .into(),
-                );
-                c.set_fault(t.error != 0);
-                let error = if t.error != 0 {
-                    format!(
-                        "{} {:02X}",
-                        if model.preferences.settings.language != 0 {
-                            "ОШИБКА"
-                        } else {
-                            "ERROR"
-                        },
-                        t.error & 255
-                    )
-                } else if model.preferences.settings.service_interval_km != 0
-                    && model.preferences.since_service_m / 1000
-                        >= model.preferences.settings.service_interval_km
-                {
-                    p.tr("SERVICE DUE").into()
-                } else {
-                    String::new()
-                };
-                c.set_error(error.into());
-                if t.electric_fresh(now) {
-                    c.set_speed_available(true);
-                    c.set_speed_tenths((p.distance(t.speed as u32) / 10) as i32);
-                    c.set_classic_speed_fill((t.speed as u32 / 75).min(100) as i32);
-                    let speed = p.distance(t.speed as u32);
-                    let power = t.voltage as i64 * t.current as i64 / 10000;
-                    c.set_compact_speed(speed >= 10000);
-                    c.set_speed_integer(format!("{}", speed / 100).into());
-                    c.set_speed_fraction(format!(".{}", speed / 10 % 10).into());
-                    c.set_speed_digit_count(if speed >= 10000 {
-                        3
-                    } else if speed >= 1000 {
-                        2
-                    } else {
-                        1
-                    });
-                    c.set_power(
-                        format!(
-                            "{power} {}",
-                            if model.preferences.settings.language != 0 {
-                                "Вт"
-                            } else {
-                                "W"
-                            }
-                        )
-                        .into(),
-                    );
-                    c.set_speed_fill(
-                        (speed
-                            / (if model.preferences.settings.imperial {
-                                40
-                            } else {
-                                60
-                            }))
-                        .min(100) as i32,
-                    );
-                    c.set_power_fill((power.max(0) / 20).min(100) as i32);
-                } else {
-                    c.set_speed_available(false);
-                    c.set_classic_speed_fill(0);
-                    c.set_speed_integer("--".into());
-                    c.set_speed_fraction(".-".into());
-                    c.set_speed_digit_count(2);
-                    c.set_compact_speed(false);
-                    c.set_power(
-                        if model.preferences.settings.language != 0 {
-                            "-- Вт"
-                        } else {
-                            "-- W"
-                        }
-                        .into(),
-                    );
-                    c.set_speed_fill(0);
-                    c.set_power_fill(0);
-                }
-            }
-            View::Ride => {
-                c.set_page_title(p.tr("RIDE STATISTICS").into());
-                self.replace_rows(p.ride_rows());
-            }
+            View::Dashboard => c.set_dashboard_data(p.dashboard()),
+            View::Ride => Self::update_model(&self.statistics, p.ride_rows()),
             View::Menu => {
-                c.set_page_title(p.tr(model.navigation.page.title()).into());
-                self.replace_rows(p.menu_rows());
+                c.set_menu_page(model.navigation.page.into());
+                c.set_menu_selected(model.navigation.selected as i32);
+                Self::update_model(&self.menu_items, p.menu_entries());
             }
             View::Information => {
-                c.set_page_title(
-                    p.tr(model
+                c.set_information_item(
+                    model
                         .navigation
                         .info_page
                         .unwrap_or(Item::BatteryInfo)
-                        .label())
                         .into(),
                 );
-                c.set_info_body(p.information().into());
+                c.set_information_data(p.information());
             }
-            View::Diagnostics => {
-                c.set_page_title(p.tr("Diagnostics").into());
-                c.set_info_body(format!("PSRAM  OK\nFLASH  {} / {:06X}\nCAN RX  {}  TX  {}\nMCU RX  {}\nADC  {} mV / {}\nUART errors  {}\nBad frames  {}\nLast CAN  {:08X}",
-                    if device.flash_writable { "OK" } else { "READ" },device.jedec,bike.rx,bike.tx,bike.mcu_rx,bike.mcu_voltage_mv,
-                    if bike.voltage_fresh(now) { "fresh" } else { "stale" },bike.uart_errors,bike.malformed,bike.last_id).into());
-            }
+            View::Diagnostics => c.set_diagnostics_data(p.diagnostics()),
         }
     }
 }

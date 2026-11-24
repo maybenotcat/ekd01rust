@@ -1,0 +1,146 @@
+export enum Screen {
+    dashboard,
+    ride,
+    menu,
+    diagnostics,
+    information,
+}
+export enum MenuPage {
+    root,
+    display,
+    motor,
+    information,
+    advanced,
+    current,
+    speed,
+    start,
+    service,
+}
+export enum MenuItem {
+    display,
+    motor,
+    information,
+    factory-reset,
+    exit,
+    brightness,
+    units,
+    auto-off,
+    trip,
+    hour,
+    minute,
+    levels,
+    limit,
+    wheel,
+    circumference,
+    battery-info,
+    ctrl-info,
+    display-info,
+    torque-info,
+    errors,
+    diagnostics,
+    service,
+    sensitivity,
+    back,
+    bluetooth,
+    advanced,
+    current,
+    speed,
+    level1,
+    level2,
+    level3,
+    level4,
+    level5,
+    level6,
+    level7,
+    level8,
+    level9,
+    start,
+    language,
+    theme,
+    service-interval,
+    service-reset,
+    error-clear,
+    power-mode,
+    service-distance,
+    odometer,
+}
+
+export enum StatusCode {
+    none, save-error, edit, apply, busy, offline, neutral, invalid,
+    reading, loaded, queued, sent, readback-ok, timeout, read-first,
+    modified, writing, verifying, verified, bad-block, mismatch,
+    powering-off, settings-save-failed, power-control-error, service-due, page-position,
+}
+
+export enum ValueKind {
+    empty, navigation, unavailable, number, percent,
+    distance-tenths, distance-hundredths, voltage, power,
+    metric-speed, wheel, millimetres, minutes, clock,
+    toggle, confirmation, theme, language, distance-unit,
+    levels, mode, kilometres, start-response, cadence, temperature,
+}
+
+// Integers stay separate from presentation, including fractional zero padding.
+export struct DisplayValue {
+    kind: ValueKind,
+    whole: int,
+    fraction: int,
+    available: bool,
+    flag: bool,
+}
+export struct MenuEntry { kind: MenuItem, value: DisplayValue }
+export enum StatisticKind { trip, range, cadence, battery, motor, controller }
+export struct Statistic { kind: StatisticKind, value: DisplayValue }
+
+// Base-10000 parts preserve all u32 counter digits through the UI boundary.
+export struct CounterValue { upper: int, lower: int }
+
+export struct DashboardData {
+    speed-tenths: int,
+    speed-available: bool,
+    classic-speed-fill: int,
+    power: DisplayValue,
+    voltage: DisplayValue,
+    battery: DisplayValue,
+    trip: DisplayValue,
+    odometer: DisplayValue,
+    assist: int,
+    lights: bool,
+    bluetooth: int,
+    fault: bool,
+    error-code: int,
+    service-due: bool,
+}
+
+export struct InformationData {
+    voltage: DisplayValue,
+    battery: DisplayValue,
+    controller-available: bool,
+    limit: int,
+    wheel: int,
+    circumference: int,
+    can-rx: CounterValue,
+    flash-jedec: int,
+    mcu0: int, mcu1: int, mcu2: int, mcu3: int, mcu4: int,
+    hour: int, minute: int,
+    error-count: int,
+    error-position: int,
+    error-code: int,
+    error-source: int,
+    error-command: int,
+    error-subcommand: int,
+}
+
+export struct DiagnosticsData {
+    flash-writable: bool,
+    flash-jedec: int,
+    can-rx: CounterValue,
+    can-tx: CounterValue,
+    mcu-rx: CounterValue,
+    adc-mv: CounterValue,
+    adc-fresh: bool,
+    uart-errors: CounterValue,
+    bad-frames: CounterValue,
+    last-can-high: int,
+    last-can-low: int,
+}

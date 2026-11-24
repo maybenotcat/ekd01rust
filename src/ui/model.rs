@@ -81,19 +81,6 @@ impl Page {
             _ => &[],
         }
     }
-    pub fn title(self) -> &'static str {
-        match self {
-            Self::Root => "SETTINGS",
-            Self::Display => "DISPLAY SETTING",
-            Self::Motor => "MOTOR SETTINGS",
-            Self::Information => "INFORMATION",
-            Self::Advanced => "ADVANCED MOTOR",
-            Self::Current => "CURRENT PER LEVEL",
-            Self::Speed => "SPEED PER LEVEL",
-            Self::Start => "START RESPONSE",
-            Self::Service => "SERVICE",
-        }
-    }
     fn parent(self) -> (Self, Item) {
         match self {
             Self::Root => (Self::Root, Item::Exit),

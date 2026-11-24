@@ -1,145 +1,94 @@
 import { ClassicDashboard } from "classic.slint";
+import { StandardDashboard } from "standard.slint";
+import { SettingsPage } from "settings.slint";
+import { RidePage } from "ride.slint";
+import { InformationPage } from "information.slint";
+import { UiText } from "text.slint";
+export { UiText } from "text.slint";
+export { MenuText } from "menu-labels.slint";
+import { Screen, MenuItem, MenuPage, MenuEntry, Statistic, StatusCode, ValueKind, StatisticKind, DashboardData, InformationData, DiagnosticsData } from "types.slint";
+export { Screen, MenuItem, MenuPage, MenuEntry, Statistic, StatusCode, ValueKind, DisplayValue, CounterValue, StatisticKind, DashboardData, InformationData, DiagnosticsData } from "types.slint";
 import "../assets/NotoSans-Regular.ttf";
 import "../assets/EKD01Speed.ttf";
-
-export struct Row { label: string, value: string, active: bool }
-
-component SummaryCard inherits Rectangle {
-    in property <string> caption;
-    in property <string> value;
-    background: #1c2939;
-    border-radius: 6px;
-    Text { x: 8px; y: 4px; width: parent.width - 16px; height: 18px; text: root.caption; color: white; font-size: 14px; horizontal-alignment: center; }
-    Text { x: 8px; y: 22px; width: parent.width - 16px; height: 20px; text: root.value; color: white; font-size: 18px; horizontal-alignment: center; }
-}
 
 export component Dashboard inherits Window {
     width: 320px;
     height: 240px;
     background: #0b1220;
     default-font-family: "Noto Sans";
-    // Runtime translations live in Rust. Retain their glyphs in the no_std font
-    // atlas even though the compiler cannot see those Rust string literals.
-    in property <string> localization-glyphs: "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя";
-    in property <int> view: 0;
+    in property <Screen> view: Screen.dashboard;
     in property <int> theme: 0;
-    // Standalone editor preview data. The Rust presenter replaces these values
-    // with application state before the first frame on the device.
-    in property <int> speed-tenths: 253;
-    in property <int> classic-speed-fill: 34;
-    in property <string> classic-speed-max: "75";
-    in property <string> classic-speed-mid: "50";
-    in property <int> assist-level: 5;
-    in property <string> odometer-text: "321.0 km";
-    in property <string> page-title;
-    in property <[Row]> rows;
-    in property <string> status;
-    in property <string> info-body;
+    in property <bool> russian;
+    in property <bool> imperial;
+    // Standalone preview data; the presenter supplies live numeric values.
+    in property <DashboardData> dashboard-data: {
+        speed-tenths: 253, speed-available: true, classic-speed-fill: 34,
+        power: { kind: ValueKind.power, whole: 742, fraction: 0, available: true, flag: false },
+        voltage: { kind: ValueKind.voltage, whole: 52, fraction: 7, available: true, flag: false },
+        battery: { kind: ValueKind.percent, whole: 78, fraction: 0, available: true, flag: false },
+        trip: { kind: ValueKind.distance-hundredths, whole: 12, fraction: 34, available: true, flag: false },
+        odometer: { kind: ValueKind.distance-tenths, whole: 321, fraction: 0, available: true, flag: false },
+        assist: 5, lights: true, bluetooth: 3, fault: false, error-code: 0, service-due: false,
+    };
+    in property <[Statistic]> statistics;
+    in property <[MenuEntry]> menu-items;
+    in property <MenuPage> menu-page: MenuPage.root;
+    in property <int> menu-selected;
+    in property <MenuItem> information-item: MenuItem.battery-info;
+    in property <InformationData> information-data;
+    in property <DiagnosticsData> diagnostics-data;
+    in property <StatusCode> status-code: StatusCode.none;
     in property <bool> status-error;
-    in property <string> speed-integer: "25";
-    in property <bool> speed-available: true;
-    in property <string> speed-fraction: ".3";
-    in property <int> speed-digit-count: 2;
-    property <length> speed-main-font: root.compact-speed ? 76px : 104px;
-    property <length> speed-main-width: root.speed-main-font * 0.572 * root.speed-digit-count;
-    property <length> speed-group-x: 89px + (178px - root.speed-main-width - 64px) / 2;
-    in property <string> speed-unit: "km/h";
-    in property <bool> compact-speed;
-    in property <int> speed-fill: 42;
-    in property <string> power: "742 W";
-    in property <int> power-fill: 37;
-    in property <string> voltage: "52.7 V";
-    in property <string> battery-text: "78%";
-    in property <int> battery: 78;
-    in property <string> assist-text: "5 / 5";
-    in property <string> assist-caption: "ASSIST";
-    in property <string> trip-text: "12.34 km";
-    in property <string> trip-caption: "TRIP";
-    in property <bool> lights: true;
-    in property <string> lights-text: "LIGHT";
-    in property <int> bluetooth: 3;
-    in property <string> error;
-    in property <bool> fault;
 
-    if root.view == 0 && root.theme == 0: Rectangle {
-        background: black;
-        // Battery and voltage occupy their own column, independent of speed.
-        Rectangle { x: 35px; y: 11px; width: 20px; height: 7px; background: white; border-radius: 2px; }
-        Rectangle { x: 20px; y: 17px; width: 50px; height: 126px; background: black; border-width: 2px; border-color: white; border-radius: 8px;
-            Rectangle { x: 5px; y: 5px; width: 40px; height: 116px; background: black; clip: true;
-                Rectangle { y: parent.height - self.height; width: parent.width; height: parent.height * root.battery / 100;
-                    background: @linear-gradient(0deg, #ff303c 0%, #ffe12d 45%, #24df79 100%);
-                }
-            }
-            Text { x: 3px; y: 5px; width: 44px; height: 26px; text: root.battery-text; color: white; font-size: 18px; horizontal-alignment: center; vertical-alignment: center; }
-        }
-        Rectangle { x: 14px; y: 148px; width: 62px; height: 22px; background: black; border-width: 1px; border-color: #28dce2; border-radius: 5px;
-            Text { width: parent.width; height: parent.height; text: root.voltage; color: white; font-size: 18px; horizontal-alignment: center; vertical-alignment: center; }
-        }
-        Rectangle { x: 83px; y: 15px; width: 1px; height: 154px; background: #28dce2; }
+    private property <string> status: root.status-code == StatusCode.page-position ? "\{root.menu-selected + 1} / \{root.menu-items.length}" : UiText.status(root.status-code, root.russian);
+    private property <string> error: UiText.dashboard-error(root.dashboard-data.fault, root.dashboard-data.error-code, root.dashboard-data.service-due, root.russian);
+    private property <string> speed-integer: root.dashboard-data.speed-available ? "\{floor(root.dashboard-data.speed-tenths / 10)}" : "--";
+    private property <string> speed-fraction: root.dashboard-data.speed-available ? ".\{mod(root.dashboard-data.speed-tenths, 10)}" : ".-";
+    private property <string> speed-unit: UiText.speed-unit(root.russian, root.imperial);
+    private property <string> power: UiText.value(root.dashboard-data.power, root.russian, root.imperial);
+    private property <int> power-fill: root.dashboard-data.power.available ? min(floor(max(root.dashboard-data.power.whole, 0) / 20), 100) : 0;
+    private property <string> voltage: UiText.value(root.dashboard-data.voltage, root.russian, root.imperial);
+    private property <string> battery-text: UiText.value(root.dashboard-data.battery, root.russian, root.imperial);
+    private property <int> battery: root.dashboard-data.battery.available ? root.dashboard-data.battery.whole : 0;
+    private property <string> trip: UiText.value(root.dashboard-data.trip, root.russian, root.imperial);
+    private property <string> odometer: UiText.value(root.dashboard-data.odometer, root.russian, root.imperial);
 
-        // Keep both speed parts on a shared baseline, including three digits.
-        Text { x: root.speed-group-x; y: 103px - 55px - root.speed-main-font * 0.388; width: root.speed-main-width; height: 110px;
-            text: root.speed-integer; color: white; font-family: "EKD01 Speed"; font-size: root.speed-main-font; horizontal-alignment: center; vertical-alignment: center;
-        }
-        Text { x: root.speed-group-x + root.speed-main-width; y: 103px - 40px - 76px * 0.388; width: 64px; height: 80px;
-            text: root.speed-fraction; color: white; font-family: "EKD01 Speed"; font-size: 76px; vertical-alignment: center;
-        }
-        if root.lights: Image { x: 273px; y: 20px; width: 30px; height: 23px; source: @image-url("../assets/classic/light.svg"); colorize: #28dce2; }
-        if root.bluetooth != 0: Image { x: 281px; y: 52px; width: 17px; height: 25px; source: @image-url("../assets/bluetooth.svg"); colorize: root.bluetooth == 3 ? #28dce2 : root.bluetooth == 2 ? #45d0e8 : #f4a34d; }
-        Text { x: 265px; y: 86px; width: 47px; height: 22px; text: root.speed-unit; color: white; font-size: 18px; horizontal-alignment: center; vertical-alignment: center; }
-        Rectangle { x: 91px; y: 112px; width: 218px; height: 1px; background: #28dce2; }
-        Text { x: 98px; y: 117px; width: 202px; height: 34px; text: root.power; color: white; font-size: 28px; horizontal-alignment: center; vertical-alignment: center; }
-        Rectangle { x: 98px; y: 154px; width: 202px; height: 10px; background: #454545; border-radius: 5px;
-            Rectangle { x: 0px; width: parent.width * root.power-fill / 100; height: parent.height; background: #ffa516; border-radius: 5px; }
-        }
-
-        Rectangle { x: 11px; y: 176px; width: 298px; height: 1px; background: #28dce2; }
-        Text { x: 12px; y: 185px; width: 101px; height: 19px; text: root.trip-caption; color: white; font-size: 14px; horizontal-alignment: center; }
-        Text { x: 12px; y: 205px; width: 101px; height: 29px; text: root.trip-text; color: white; font-size: 20px; horizontal-alignment: center; vertical-alignment: center; }
-        Rectangle { x: 119px; y: 188px; width: 1px; height: 40px; background: #28dce2; }
-        Rectangle { x: 133px; y: 183px; width: 54px; height: 50px; background: black; border-width: 2px; border-color: #28dce2; border-radius: 15px;
-            Text { width: parent.width; height: parent.height; text: root.assist-level; color: white; font-size: 28px; horizontal-alignment: center; vertical-alignment: center; }
-        }
-        Rectangle { x: 201px; y: 188px; width: 1px; height: 40px; background: #28dce2; }
-        Text { x: 208px; y: 185px; width: 101px; height: 19px; text: "ODO"; color: white; font-size: 14px; horizontal-alignment: center; }
-        Text { x: 208px; y: 205px; width: 101px; height: 29px; text: root.odometer-text; color: white; font-size: 20px; horizontal-alignment: center; vertical-alignment: center; }
-
-        // Faults and operation results overlay the dashboard only when present.
-        if root.error != "" || root.status != "": Rectangle {
-            x: 91px; y: 1px; width: 218px; height: 20px; background: black;
-            Text { width: parent.width; height: parent.height; text: root.status != "" ? root.status : root.error;
-                color: root.status-error || root.fault ? #ff6868 : #ffbd55; font-size: 13px; horizontal-alignment: center; vertical-alignment: center;
-            }
-        }
-    }
-    if root.view == 0 && root.theme == 1: ClassicDashboard {
+    if root.view == Screen.dashboard && root.theme == 0: StandardDashboard {
         width: 320px; height: 240px;
-        speed-tenths: root.speed-tenths; speed-available: root.speed-available;
-        speed-fill: root.classic-speed-fill; power-fill: root.power-fill;
-        speed-unit: root.speed-unit; speed-max: root.classic-speed-max; speed-mid: root.classic-speed-mid;
+        speed-integer: root.speed-integer; speed-fraction: root.speed-fraction;
+        speed-digit-count: !root.dashboard-data.speed-available ? 2 : root.dashboard-data.speed-tenths >= 1000 ? 3 : root.dashboard-data.speed-tenths >= 100 ? 2 : 1;
+        compact-speed: root.dashboard-data.speed-available && root.dashboard-data.speed-tenths >= 1000;
+        speed-unit: root.speed-unit; power: root.power; power-fill: root.power-fill;
+        voltage: root.voltage; battery: root.battery; battery-text: root.battery-text;
+        assist-level: root.dashboard-data.assist; trip-text: root.trip; trip-caption: UiText.caption(StatisticKind.trip, root.russian);
+        odometer-text: root.odometer; lights: root.dashboard-data.lights; bluetooth: root.dashboard-data.bluetooth;
+        russian: root.russian;
+        status: root.status; status-error: root.status-error; error: root.error; fault: root.dashboard-data.fault;
+    }
+    if root.view == Screen.dashboard && root.theme == 1: ClassicDashboard {
+        width: 320px; height: 240px;
+        speed-tenths: root.dashboard-data.speed-tenths; speed-available: root.dashboard-data.speed-available;
+        speed-fill: root.dashboard-data.classic-speed-fill;
+        power-fill: root.power-fill;
+        speed-unit: root.speed-unit; speed-max: root.imperial ? "47" : "75"; speed-mid: root.imperial ? "31" : "50";
         power: root.power; battery: root.battery; battery-text: root.battery-text;
-        voltage: root.voltage; assist: root.assist-level; trip: root.trip-text; odometer: root.odometer-text;
-        lights: root.lights; bluetooth: root.bluetooth; error: root.error; fault: root.fault;
+        voltage: root.voltage; assist: root.dashboard-data.assist; trip: root.trip; odometer: root.odometer;
+        lights: root.dashboard-data.lights; bluetooth: root.dashboard-data.bluetooth; error: root.error; fault: root.dashboard-data.fault;
+        russian: root.russian;
         status: root.status; status-error: root.status-error;
     }
-    if root.view != 0: Rectangle {
-        background: transparent;
-        Text { x: 10px; y: 7px; width: 300px; height: 25px; text: root.page-title; color: white; font-size: 19px; }
-        if root.view == 1: Rectangle {
-            for row[index] in root.rows: SummaryCard { x: 8px + mod(index, 2) * 156px; y: 36px + floor(index / 2) * 65px; width: 148px; height: 58px; caption: row.label; value: row.value; }
-        }
-        if root.view == 2: Rectangle {
-            for row[index] in root.rows: Rectangle {
-                x: 8px; y: 36px + index * 36px; width: 304px; height: 34px;
-                background: row.active ? #24475b : #1c2939; border-radius: 5px;
-                Text { x: 8px; width: 179px; height: parent.height; text: row.label; color: white; font-size: 14px; vertical-alignment: center; }
-                Text { x: 188px; width: 108px; height: parent.height; text: row.value; color: white; font-size: 14px; horizontal-alignment: right; vertical-alignment: center; }
-            }
-        }
-        if root.view == 3 || root.view == 4: Text {
-            x: 10px; y: 38px; width: 300px; height: 178px; text: root.info-body; color: white; font-size: 14px; wrap: word-wrap;
-        }
-        Text { x: 8px; y: 219px; width: 304px; height: 18px; text: root.status; color: root.status-error ? #ff6868 : white; font-size: 13px; }
+    if root.view == Screen.menu: SettingsPage {
+        page: root.menu-page; items: root.menu-items; selected: root.menu-selected;
+        russian: root.russian; imperial: root.imperial;
+        status: root.status; status-error: root.status-error;
+    }
+    if root.view == Screen.ride: RidePage {
+        statistics: root.statistics; russian: root.russian; imperial: root.imperial;
+        status: root.status; status-error: root.status-error;
+    }
+    if root.view == Screen.information || root.view == Screen.diagnostics: InformationPage {
+        item: root.information-item; data: root.information-data;
+        diagnostics: root.diagnostics-data; show-diagnostics: root.view == Screen.diagnostics;
+        russian: root.russian; status: root.status; status-error: root.status-error;
     }
 }

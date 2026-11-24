@@ -1,3 +1,5 @@
+import { UiText } from "text.slint";
+import { StatisticKind } from "types.slint";
 import "../assets/Oxanium-Medium.ttf";
 
 export component ClassicDashboard inherits Rectangle {
@@ -5,6 +7,7 @@ export component ClassicDashboard inherits Rectangle {
     // application state, overriding these defaults in the firmware.
     width: 320px;
     height: 240px;
+    in property <bool> russian;
     in property <int> speed-tenths: 253;
     in property <bool> speed-available: true;
     in property <int> speed-fill: 34;
@@ -85,8 +88,8 @@ export component ClassicDashboard inherits Rectangle {
         }
     }
 
-    Text { x: 8px; y: 194px; width: 98px; height: 18px; text: "TRIP"; color: #ff6255; font-size: 14px; horizontal-alignment: center; }
-    Text { x: 158px; y: 194px; width: 89px; height: 18px; text: "ODO"; color: #ff6255; font-size: 14px; horizontal-alignment: center; }
+    Text { x: 8px; y: 194px; width: 98px; height: 18px; text: UiText.caption(StatisticKind.trip, root.russian); color: #ff6255; font-size: 14px; horizontal-alignment: center; }
+    Text { x: 158px; y: 194px; width: 89px; height: 18px; text: UiText.odometer-caption(root.russian); color: #ff6255; font-size: 14px; horizontal-alignment: center; }
     Rectangle { x: 5px; y: 212px; width: 103px; height: 2px; background: white; }
     Rectangle { x: 154px; y: 212px; width: 91px; height: 2px; background: white; }
     Rectangle { x: 252px; y: 212px; width: 65px; height: 2px; background: white; }
