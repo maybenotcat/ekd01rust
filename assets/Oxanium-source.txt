@@ -1,0 +1,8 @@
+Oxanium Medium, unmodified static TrueType font by Severin Meyer.
+Source revision: a8f39e0c71186190027a093e9001459410192d1e
+Source URL: https://github.com/sevmeyer/oxanium/blob/a8f39e0c71186190027a093e9001459410192d1e/fonts/ttf/Oxanium-Medium.ttf
+License: Oxanium-OFL.txt (SIL Open Font License 1.1).
+
+The embedded raster atlas includes only digits, period and minus at the sizes
+listed in config/font-atlases.txt. The original TTF enables standalone Slint
+editor previews without depending on a system-installed font.
