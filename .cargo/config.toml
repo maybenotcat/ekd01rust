@@ -16,7 +16,10 @@ SLINT_FONT_ATLAS_REPORT = { value = "build/font-atlases.tsv", relative = true }
 RAYON_NUM_THREADS = "2"
 
 [target.armv5te-none-eabi]
-rustflags = ["-C", "link-arg=-Tplatform/link.ld", "-C", "relocation-model=static"]
+rustflags = ["-C", "relocation-model=static"]
+
+[target.thumbv5te-none-eabi]
+rustflags = ["-C", "relocation-model=static"]
 
 [unstable]
 build-std = ["core", "alloc", "compiler_builtins"]

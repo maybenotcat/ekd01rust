@@ -9,3 +9,4 @@ __pycache__/
 /README*
 !/README.md
 /*.log
+/boot-readback*.bin

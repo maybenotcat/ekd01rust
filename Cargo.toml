@@ -6,11 +6,14 @@ publish = false
 build = "build.rs"
 
 [workspace]
-members = ["xtask", "flasher", "ble-client"]
+members = ["xtask", "flasher", "ble-client", "boot-contract", "bootloader"]
 default-members = ["."]
 resolver = "3"
 
 [dependencies]
+ekd01-boot-contract = { path = "boot-contract" }
+embassy-boot = { path = "third_party/embassy-boot" }
+embedded-storage = "0.3.1"
 critical-section = { version = "1.2", features = ["restore-state-u32"] }
 portable-atomic = { version = "1.11", features = ["critical-section"] }
 embassy-executor = { version = "=0.10.0", features = ["platform-spin", "executor-thread"] }
@@ -44,11 +47,15 @@ debug = 2
 [profile.dev]
 panic = "abort"
 
+[profile.release.package.ekd01-bootloader]
+opt-level = "z"
+
 [patch.crates-io]
 i-slint-compiler = { path = "third_party/slint-compiler" }
 embassy-executor = { path = "third_party/embassy-executor" }
 lock_api = { path = "third_party/lock_api" }
 futures-intrusive = { path = "third_party/futures-intrusive" }
 embassy-sync = { path = "third_party/embassy-sync" }
+embassy-hal-internal = { path = "third_party/embassy-hal-internal" }
 littlefs2-rust = { path = "third_party/littlefs_rust" }
 

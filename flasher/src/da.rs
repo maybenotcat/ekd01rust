@@ -270,8 +270,10 @@ impl<T: Read + Write> DownloadAgent<T> {
         Ok(())
     }
     pub fn bootloaders(&mut self, images: &[Image]) -> Result<()> {
-        if images.len() != 2 || images[0].kind != 1 || images[1].kind != 2 {
-            return Err("Expected original BL and EXT_BL".into());
+        if !matches!(images, [first] if first.kind == 1)
+            && !matches!(images, [first, second] if first.kind == 1 && second.kind == 2)
+        {
+            return Err("Expected one ARM_BL, or original BL and EXT_BL".into());
         }
         self.wire.phase = "DA boot region metadata";
         // Use DA 0x51, not DA_MEM: BL's 70006000 is a RAM address and its real
@@ -285,7 +287,7 @@ impl<T: Read + Write> DownloadAgent<T> {
         if ![ACK, CONTINUE].contains(&layout) {
             return Err(format!("Boot layout response {layout:02X}"));
         }
-        self.wire.put32(2)?;
+        self.wire.put32(images.len() as u32)?;
         self.wire.send(&[ACK, NACK])?;
         self.wire.expect(&[ACK, ACK])?;
         for image in images {
@@ -300,6 +302,16 @@ impl<T: Read + Write> DownloadAgent<T> {
         self.wire.ack()?;
         let flags = self.wire.be32()?;
         println!("BOOT REGION DONE: flags={flags:08X}");
+        Ok(())
+    }
+    pub fn verify_boot_metadata(&mut self, images: &[Image]) -> Result<()> {
+        let mut metadata = Vec::with_capacity(1024);
+        self.read(0, 1024, |bytes| {
+            metadata.extend_from_slice(bytes);
+            Ok(())
+        })?;
+        crate::images::validate_boot_metadata(&metadata, images)?;
+        println!("BOOT METADATA OK: SF_BOOT/BRLYT; attributes match GFH_BL_INFO");
         Ok(())
     }
     pub fn reset(&mut self) -> Result<()> {
@@ -440,6 +452,7 @@ mod tests {
             input.extend([ACK, ACK, ACK, ACK, CONTINUE, ACK, ACK, ACK, ACK]);
             let mut da = ready(&input);
             let image = Image {
+                boot_attributes: 0,
                 name: "test".into(),
                 bytes: vec![1, 2, 3, 4],
                 kind: 0x100,
@@ -493,20 +506,30 @@ mod tests {
             .unwrap()
         })
         .collect();
-        let mut input = vec![ACK, ACK, CONTINUE, ACK, ACK, ACK, ACK, ACK, ACK];
-        for image in &images {
-            input.extend(std::iter::repeat_n(
-                CONTINUE,
-                image.bytes.len().div_ceil(BLOCK),
-            ));
+        for count in [1, 2] {
+            let images = &images[..count];
+            let mut input = vec![ACK, ACK, CONTINUE];
+            input.extend(std::iter::repeat_n(ACK, 4 + count));
+            for image in images {
+                input.extend(std::iter::repeat_n(
+                    CONTINUE,
+                    image.bytes.len().div_ceil(BLOCK),
+                ));
+            }
+            input.push(ACK);
+            input.extend(2u32.to_be_bytes());
+            let mut da = ready(&input);
+            da.bootloaders(images).unwrap();
+            assert!(da.wire.transport.input.is_empty());
+            assert_eq!(da.wire.transport.output[0], 0x51);
+            assert_eq!(images[0].physical, 0x800);
+            assert_eq!(
+                &da.wire.transport.output[6..10],
+                &(count as u32).to_be_bytes()
+            );
+            if count == 2 {
+                assert_eq!(images[1].physical, 0x27000);
+            }
         }
-        input.push(ACK);
-        input.extend(2u32.to_be_bytes());
-        let mut da = ready(&input);
-        da.bootloaders(&images).unwrap();
-        assert!(da.wire.transport.input.is_empty());
-        assert_eq!(da.wire.transport.output[0], 0x51);
-        assert_eq!(images[0].physical, 0x800);
-        assert_eq!(images[1].physical, 0x27000);
     }
 }

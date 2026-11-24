@@ -22,7 +22,7 @@ Install Rust through rustup. On Windows, install MSVC Build Tools and the Window
 cargo xtask build
 ```
 
-The flash kit is generated in `target/flash-kit`.
+The flash kit is generated in `target/flash-kit`, including the single MT2502 Embassy Boot loader.
 
 ## Flash
 
@@ -34,11 +34,13 @@ cargo flasher download --kit target/flash-kit
 
 Start the command, then connect the display via USB with main power disconnected. The flasher selects the first newly appearing serial port.
 
-By default, only the application is flashed. Existing bootloaders are preserved. To also flash the original bootloaders, add `--bootloaders`:
+By default, only the application is flashed and existing bootloaders are preserved. To install the new single Embassy Boot loader, replacing the original BL/EXT_BL boot path, use:
 
 ```sh
 cargo flasher download --kit target/flash-kit --bootloaders
 ```
+
+Booting through the custom loader has been tested on the N22 device. Update swapping and rollback still need hardware testing. The loader keeps the application at its original address and leaves settings and the auxiliary MCU unchanged. After installing it, `cargo flasher stage --kit target/flash-kit` writes an update to the spare slot. The next boot swaps it into place; the application confirms startup after its first LCD frame. An unconfirmed update reverts on the following boot. Direct `download` resets the rollback state after readback verification.
 
 A bad firmware image can be recovered through the chip's built-in BootROM, even if the flash bootloaders are erased. Firmware flashing does not overwrite BootROM.
 

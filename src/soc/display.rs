@@ -48,7 +48,9 @@ impl Display {
         display.clock.mode(1);
         write32(DRVPDN_CON0_CLR, EKD_PDN_LCD_CLOCKS);
         pmu.enable_lcd_supply();
+        Timer::verify_progress();
         Timer::delay_ms(20).await;
+        DebugUart::log("[LCD] SUPPLY_SETTLED; BUS_INIT_ENTER\n");
         update32(
             LCD_GMCCON_REG,
             LCD_GMC_THROTTLE_BURST_MASK,
@@ -71,6 +73,7 @@ impl Display {
             EKD_LCD_PAD_DRIVE_MASK,
             EKD_LCD_PAD_DRIVE_VALUE,
         );
+        DebugUart::log("[LCD] BUS_INIT_EXIT; READ_ID_ENTER\n");
         let id = display.read_id().await;
         DebugUart::hex("[LCD] ID", id);
         let middle = (id >> 8) & 0xffff;

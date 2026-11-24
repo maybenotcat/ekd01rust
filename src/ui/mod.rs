@@ -129,6 +129,7 @@ impl UserInterface {
             self.display.present(words, region).await?;
             if self.first_frame {
                 crate::soc::DebugUart::log("[LCD] FIRST_PRESENT_EXIT\n");
+                crate::boot::confirm_first_frame();
             }
             self.first_frame = false;
         }

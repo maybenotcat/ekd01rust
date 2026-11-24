@@ -2,7 +2,7 @@ OUTPUT_FORMAT("elf32-littlearm")
 OUTPUT_ARCH(arm)
 ENTRY(ekd_entry)
 MEMORY {
-    FLASH (rx) : ORIGIN = 0x10050520, LENGTH = 0x4afae0
+    FLASH (rx) : ORIGIN = 0x10050520, LENGTH = 0x1ffae0
     SRAM (rwx) : ORIGIN = 0x70008000, LENGTH = 0x1000
     PSRAM (rw) : ORIGIN = 0x00100000, LENGTH = 0x5e0000
 }
@@ -20,7 +20,7 @@ SECTIONS {
     __irq_stack_top = 0x70009800;
     __stack_top = 0x006f0000;
     ASSERT(SIZEOF(.vectors) == 64, "ARM vectors must contain eight absolute targets")
-    ASSERT(__flash_image_end <= 0x10500000, "Image overlaps private settings partition")
+    ASSERT(__flash_image_end <= 0x10250000, "Image overlaps Embassy Boot DFU partition")
     ASSERT(__heap_end <= 0x006e0000, "Heap overlaps application stack")
     /* panic=abort: no stack unwinder. PREL31 tables cannot span the >1GiB
      * distance between XIP and the original internal SRAM execution window. */

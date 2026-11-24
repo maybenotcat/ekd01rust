@@ -3,7 +3,9 @@ use crate::{Result, read};
 use std::path::Path;
 
 pub const ENTRY: u32 = 0x1005_0520;
-pub const STORAGE_BASE: u32 = 0x1050_0000;
+pub const STORAGE_BASE: u32 = ekd01_boot_contract::NOR_BASE + ekd01_boot_contract::ACTIVE.end;
+pub const BOOT_ENTRY: u32 = 0x7000_6140;
+pub const BOOT_LIMIT: u32 = ekd01_boot_contract::BOOT_ROM_END - ekd01_boot_contract::BOOT_HASH_BYTES;
 
 fn word(bytes: &[u8], offset: usize) -> Result<u32> {
     let slice = bytes
@@ -23,11 +25,19 @@ pub fn payload(path: &Path) -> Result<Vec<u8>> {
 }
 
 fn extract(bytes: &[u8]) -> Result<Vec<u8>> {
+    extract_at(bytes, ENTRY, STORAGE_BASE, true)
+}
+
+pub fn boot_payload(path: &Path) -> Result<Vec<u8>> {
+    extract_at(&read(path)?, BOOT_ENTRY, BOOT_LIMIT, false)
+}
+
+fn extract_at(bytes: &[u8], entry: u32, limit: u32, application: bool) -> Result<Vec<u8>> {
     if bytes.get(..7) != Some(b"\x7fELF\x01\x01\x01") {
         return Err("Expected ELF32 little-endian".into());
     }
-    if half(bytes, 18)? != 40 || word(bytes, 24)? != ENTRY {
-        return Err("Expected ARM entry at original BL handoff".into());
+    if half(bytes, 18)? != 40 || word(bytes, 24)? != entry {
+        return Err(format!("Expected ARM entry at {entry:08X}"));
     }
     let phoff = word(bytes, 28)? as usize;
     let phsize = half(bytes, 42)?;
@@ -55,19 +65,19 @@ fn extract(bytes: &[u8]) -> Result<Vec<u8>> {
             .get(offset..offset.checked_add(size).ok_or("ELF offset overflow")?)
             .ok_or("Truncated ELF segment")?;
         let end = (physical as u64) + size as u64;
-        if end <= ENTRY as u64 || physical >= STORAGE_BASE {
-            if flags & 1 != 0 && physical >= STORAGE_BASE && virtual_address == physical {
+        if end <= entry as u64 || physical >= limit {
+            if flags & 1 != 0 && physical >= limit && virtual_address == physical {
                 return Err("Executable segment outside protected XIP region".into());
             }
             continue;
         }
-        if end > STORAGE_BASE as u64 {
+        if end > limit as u64 {
             return Err("ELF load data overlaps littlefs partition".into());
         }
-        let begin = physical.max(ENTRY);
+        let begin = physical.max(entry);
         segments.push((begin, &block[(begin - physical) as usize..]));
     }
-    if segments.iter().map(|(begin, _)| *begin).min() != Some(ENTRY) {
+    if segments.iter().map(|(begin, _)| *begin).min() != Some(entry) {
         return Err("Missing vector payload".into());
     }
     let end = segments
@@ -75,12 +85,12 @@ fn extract(bytes: &[u8]) -> Result<Vec<u8>> {
         .map(|(begin, block)| *begin as usize + block.len())
         .max()
         .unwrap();
-    let mut payload = vec![0xff; end - ENTRY as usize];
+    let mut payload = vec![0xff; end - entry as usize];
     for (begin, block) in segments {
-        let offset = (begin - ENTRY) as usize;
+        let offset = (begin - entry) as usize;
         payload[offset..offset + block.len()].copy_from_slice(block);
     }
-    if payload.get(..4) != Some(b"\x18\xf0\x9f\xe5") {
+    if application && payload.get(..4) != Some(b"\x18\xf0\x9f\xe5") {
         return Err("Unexpected ARM absolute vector instruction".into());
     }
     Ok(payload)

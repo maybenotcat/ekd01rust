@@ -24,6 +24,7 @@ fn help() {
         cargo flasher plan --kit target/flash-kit [--bootloaders]\n\
         cargo flasher probe [--port COM3]\n\
         cargo flasher download --kit target/flash-kit [--port COM3] [--bootloaders] [--no-reset]\n\
+        cargo flasher stage --kit target/flash-kit [--port COM3] [--no-reset]\n\
         cargo flasher verify --kit target/flash-kit [--port COM3] [--bootloaders]\n\
         cargo flasher readback --output backup.bin [--port COM3] [--start 0x0 --length 0x800000]\n\
         cargo flasher format --all [--port COM3]\n\
@@ -32,6 +33,8 @@ fn help() {
         ports are ignored and the first newly appearing port is selected (any VID/PID).\n\
         Reconnecting an existing port also works. Explicit --port accepts /dev/ttyACM0.\n\
         Download writes only the main application unless --bootloaders is selected.\n\
+        Embassy kits also reset rollback state after verified direct download.\n\
+        Stage keeps the active image and marks a verified spare-slot update pending.\n\
         Format is separate; --all erases the entire 8 MiB, including settings and loaders.\n\
         Every download is verified by reading back the complete written images.\n\
         Native implementation; no Flash_tool.exe, DLLs, Python or auxiliary MCU update."
@@ -46,7 +49,7 @@ fn run() -> Result<()> {
         return Ok(());
     }
     if ![
-        "ports", "plan", "probe", "download", "verify", "readback", "format",
+        "ports", "plan", "probe", "download", "stage", "verify", "readback", "format",
     ]
     .contains(&operation)
     {
@@ -109,9 +112,19 @@ fn run() -> Result<()> {
     if bootloaders && !["plan", "download", "verify"].contains(&operation) {
         return Err("--bootloaders requires plan, download or verify".into());
     }
-    let selected = if ["plan", "download", "verify"].contains(&operation) {
+    let selected = if ["plan", "download", "stage", "verify"].contains(&operation) {
         let kit = images::Kit::load(&kit.ok_or("Specify --kit directory-or-scatter")?)?;
-        kit.print(bootloaders);
+        if operation == "stage" {
+            let staged = kit.staged_application()?;
+            println!(
+                "STAGE {:08X}..{:08X} {}; active and settings preserved",
+                staged.physical,
+                staged.physical + staged.bytes.len() as u32,
+                staged.name
+            );
+        } else {
+            kit.print(bootloaders);
+        }
         Some(kit)
     } else {
         None
@@ -185,13 +198,47 @@ fn run() -> Result<()> {
             file.sync_all().map_err(|e| e.to_string())?;
             println!("READBACK COMPLETE: {} ({bytes} bytes)", path.display());
         }
+        "stage" => {
+            let kit = selected.as_ref().unwrap();
+            // A pending trial must boot/confirm or revert before its backup is
+            // reused. Also prove that the matching custom loader is installed.
+            agent.verify(&kit.images[0])?;
+            agent.verify_boot_metadata(&kit.images[..kit.images.len() - 1])?;
+            let state = ekd01_boot_contract::STATE;
+            let mut magic = Vec::new();
+            agent.read(state.start, 4, |bytes| {
+                magic.extend_from_slice(bytes);
+                Ok(())
+            })?;
+            if magic == ekd01_boot_contract::PENDING_MARKER {
+                return Err("An update is already pending; boot the display first".into());
+            }
+            let dfu = ekd01_boot_contract::DFU;
+            agent.format(dfu.start, dfu.len())?;
+            let staged = kit.staged_application()?;
+            agent.application(&staged)?;
+            agent.verify(&staged)?;
+            // Mark pending last, after complete readback verification.
+            agent.format(state.start, state.len())?;
+            let marker = kit.pending_marker()?;
+            agent.application(&marker)?;
+            agent.verify(&marker)?;
+            println!("STAGE COMPLETE; next boot swaps and requires application confirmation");
+            if reset {
+                agent.reset()?;
+            }
+        }
         "download" | "verify" => {
             let kit = selected.as_ref().unwrap();
             if operation == "download" {
                 if bootloaders {
-                    agent.bootloaders(&kit.images[..2])?;
+                    agent.bootloaders(&kit.images[..kit.images.len() - 1])?;
+                    agent.verify_boot_metadata(&kit.images[..kit.images.len() - 1])?;
                 }
-                agent.application(&kit.images[2])?;
+                agent.application(kit.images.last().unwrap())?;
+            }
+            if operation == "verify" && bootloaders {
+                agent.verify_boot_metadata(&kit.images[..kit.images.len() - 1])?;
             }
             for image in kit
                 .images
@@ -199,6 +246,18 @@ fn run() -> Result<()> {
                 .filter(|image| bootloaders || image.kind == 0x100)
             {
                 agent.verify(image)?;
+            }
+            if operation == "download" && kit.embassy {
+                let state = ekd01_boot_contract::STATE;
+                agent.format(state.start, state.len())?;
+                agent.read(state.start, state.len(), |bytes| {
+                    if bytes.iter().all(|byte| *byte == 0xff) {
+                        Ok(())
+                    } else {
+                        Err("Embassy state erase verification failed".into())
+                    }
+                })?;
+                println!("BOOT STATE RESET; settings preserved");
             }
             println!("{} COMPLETE", operation.to_uppercase());
             if operation == "download" && reset {

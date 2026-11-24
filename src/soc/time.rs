@@ -54,6 +54,45 @@ impl Timer {
     pub fn now() -> u32 {
         TIME.now() as u32
     }
+    /// Prove the IRQ-driven timebase before awaiting it. GPT4 is the independent
+    /// 26MHz counter used by the original loader for PLL settling, not Embassy time.
+    pub fn verify_progress() {
+        update32(GPT4_CTRL, 0, GPT4_ENABLE);
+        let start = read32(GPT4_COUNT);
+        let tick = Self::now();
+        // The iteration cap also bounds failure if GPT4 itself is stopped.
+        for _ in 0..5_000_000 {
+            if Self::now().wrapping_sub(tick) >= 2 {
+                DebugUart::log("[EMBASSY] TICK_IRQ_OK\n");
+                return;
+            }
+            if read32(GPT4_COUNT).wrapping_sub(start) >= 100 * EKD_GPT4_TICKS_PER_MS {
+                break;
+            }
+        }
+        let cpsr: u32;
+        unsafe { core::arch::asm!("mrs {0}, cpsr", out(reg) cpsr, options(nostack)); }
+        DebugUart::hex("[EMBASSY] CPSR", cpsr);
+        DebugUart::hex("[EMBASSY] TICKS", Self::now());
+        DebugUart::hex("[EMBASSY] GPT4_ELAPSED", read32(GPT4_COUNT).wrapping_sub(start));
+        DebugUart::hex("[EMBASSY] GPT1_CTRL", read16(GPT1_CTRL) as u32);
+        DebugUart::hex("[EMBASSY] GPT1_LEN", read16(GPT1_LEN) as u32);
+        DebugUart::hex("[EMBASSY] GPT1_PRESCALER", read16(GPT1_PRESCALER) as u32);
+        DebugUart::hex("[EMBASSY] IRQ_MASK0", read32(IRQ_MASK0));
+        DebugUart::hex("[EMBASSY] IRQ_STA2", read32(IRQ_STA2));
+        // Reading GPT_STS acknowledges its pending bits; only do it on failure.
+        DebugUart::hex("[EMBASSY] GPT_STS", read16(GPT_STS) as u32);
+        DebugUart::hex("[EMBASSY] RTC_XOSCCAL", read16(RTC_XOSCCAL) as u32);
+        // Address zero is a physical exception vector, so use an instruction
+        // rather than constructing a null Rust pointer for volatile access.
+        for address in [0x18u32, 0x38] {
+            let value: u32;
+            unsafe { core::arch::asm!("ldr {value}, [{address}]", value = out(reg) value,
+                address = in(reg) address, options(nostack, readonly)); }
+            DebugUart::hex("[EMBASSY] IRQ_VECTOR", value);
+        }
+        panic!("GPT1 IRQ timebase stopped");
+    }
     /// Called only by the thread-mode executor, never by an IRQ or task poll.
     pub fn poll_deadlines() {
         let now = TIME.now();

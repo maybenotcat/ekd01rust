@@ -1,5 +1,6 @@
 //! Strict EKD01 scatter/GFH planning, performed before opening any port.
 use crate::Result;
+use ekd01_boot_contract as layout;
 use sha2::{Digest, Sha256};
 use std::{
     fs,
@@ -8,6 +9,7 @@ use std::{
 
 pub const FLASH_BYTES: u32 = 0x800000;
 pub const SETTINGS_BEGIN: u32 = 0x500000;
+#[derive(Clone)]
 pub struct Image {
     pub name: String,
     pub bytes: Vec<u8>,
@@ -16,10 +18,53 @@ pub struct Image {
     pub physical: u32,
     pub content: u32,
     pub jump: u32,
+    pub boot_attributes: u32,
     pub attributes: u32,
 }
 fn le32(bytes: &[u8], offset: usize) -> u32 {
     u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap())
+}
+
+/// Check metadata produced by the original DA, independently of GFH readback.
+/// DA 10029690 copies descriptor+16 into BRLYT.m_bl_attribute.
+pub fn validate_boot_metadata(bytes: &[u8], images: &[Image]) -> Result<()> {
+    const BRLYT: usize = 512;
+    const DESCRIPTORS: usize = BRLYT + 20;
+    if bytes.len() < DESCRIPTORS + 8 * 20 || images.is_empty() || images.len() > 8 {
+        return Err("Incomplete boot metadata".into());
+    }
+    if &bytes[..8] != b"SF_BOOT\0"
+        || le32(bytes, 12) != 1
+        || le32(bytes, 16) != 512
+        || &bytes[BRLYT..BRLYT + 8] != b"BRLYT\0\0\0"
+        || le32(bytes, BRLYT + 8) != 1
+    {
+        return Err("Invalid SF_BOOT/BRLYT header".into());
+    }
+    for (index, image) in images.iter().enumerate() {
+        let at = DESCRIPTORS + index * 20;
+        let kind = u16::from_le_bytes(bytes[at + 6..at + 8].try_into().unwrap());
+        if le32(bytes, at) != 0x42424242
+            || bytes[at + 4] != 7
+            || kind != image.kind
+            || le32(bytes, at + 8) != image.physical
+            || le32(bytes, at + 12) != image.physical + image.bytes.len() as u32
+            || le32(bytes, at + 16) != image.boot_attributes
+        {
+            return Err(format!(
+                "{}: BRLYT mismatch; attributes={:08X}, expected={:08X}",
+                image.name,
+                le32(bytes, at + 16),
+                image.boot_attributes
+            ));
+        }
+    }
+    for index in images.len()..8 {
+        if le32(bytes, DESCRIPTORS + index * 20) == 0x42424242 {
+            return Err("Unexpected extra bootloader in BRLYT".into());
+        }
+    }
+    Ok(())
 }
 impl Image {
     pub fn parse(name: String, bytes: Vec<u8>) -> Result<Self> {
@@ -64,6 +109,35 @@ impl Image {
         {
             return Err(format!("{name}: unexpected application entry layout"));
         }
+        let mut boot_attributes = None;
+        if kind != 0x100 {
+            let mut at = 0usize;
+            while at + 8 <= content as usize {
+                if bytes.get(at..at + 3) != Some(b"MMM") {
+                    return Err(format!("{name}: invalid GFH record"));
+                }
+                let size = u16::from_le_bytes(bytes[at + 4..at + 6].try_into().unwrap()) as usize;
+                if size < 8 || at + size > content as usize {
+                    return Err(format!("{name}: invalid GFH record size"));
+                }
+                let record_type = u16::from_le_bytes(bytes[at + 6..at + 8].try_into().unwrap());
+                if record_type == 1 {
+                    if size < 12 || boot_attributes.is_some() {
+                        return Err(format!("{name}: invalid BL_INFO"));
+                    }
+                    boot_attributes = Some(le32(&bytes, at + 8));
+                }
+                at += size;
+            }
+            if boot_attributes.is_none() {
+                return Err(format!("{name}: missing GFH_BL_INFO"));
+            }
+            if kind == 1 && boot_attributes.unwrap() & 1 == 0 {
+                return Err(format!(
+                    "{name}: GFH_BL_INFO does not enable LOAD_BY_BOOTROM"
+                ));
+            }
+        }
         Ok(Self {
             name,
             bytes,
@@ -72,10 +146,13 @@ impl Image {
             physical,
             content,
             jump,
+            boot_attributes: boot_attributes.unwrap_or(0),
             attributes,
         })
     }
-    // DA 0x51 descriptor, confirmed in original sub_1002918E. Numbers on wire
+    // DA 0x51 descriptor, confirmed in sub_1002918E and consumer 10029690.
+    // The third word is GFH_BL_INFO.m_bl_attr, NOT the GFH jump offset.
+    // The final word is FILE_INFO attributes, a separate field. Numbers on wire
     // are big-endian, despite the little-endian GFH file.
     pub fn boot_descriptor(&self) -> Vec<u8> {
         let mut out = vec![0x5a, 7]; // enabled, GFH_FLASH_DEV_SF
@@ -83,7 +160,7 @@ impl Image {
         for value in [
             self.load,
             self.load + self.bytes.len() as u32,
-            self.jump,
+            self.boot_attributes,
             self.content,
         ] {
             out.extend(value.to_be_bytes());
@@ -100,8 +177,38 @@ impl Image {
 pub struct Kit {
     pub images: Vec<Image>,
     pub scatter: PathBuf,
+    pub embassy: bool,
 }
 impl Kit {
+    pub fn staged_application(&self) -> Result<Image> {
+        if !self.embassy {
+            return Err("Staging requires an Embassy kit".into());
+        }
+        let mut image = self.images.last().unwrap().clone();
+        image.physical = layout::DFU.start;
+        image.name = format!("DFU/{}", image.name);
+        Ok(image)
+    }
+
+    pub fn pending_marker(&self) -> Result<Image> {
+        if !self.embassy {
+            return Err("Staging requires an Embassy kit".into());
+        }
+        // DA_MEM writes a bounded byte range; these four bytes are Embassy's
+        // SWAP word, not a second executable or an auxiliary MCU image.
+        Ok(Image {
+            name: "Embassy pending marker".into(),
+            bytes: layout::PENDING_MARKER.to_vec(),
+            kind: 0x100,
+            load: 0,
+            physical: layout::STATE.start,
+            content: 0,
+            jump: 0,
+            boot_attributes: 0,
+            attributes: 0,
+        })
+    }
+
     pub fn load(input: &Path) -> Result<Self> {
         let scatter = if input.is_dir() {
             input.join("SOUTHBASE2502C_WT_11C_BB.cfg")
@@ -138,12 +245,14 @@ impl Kit {
             }
         }
         images.sort_by_key(|image| image.kind);
-        if images.iter().map(|image| image.kind).collect::<Vec<_>>() != [1, 2, 0x100] {
-            return Err("Scatter must contain exactly ARM_BL, ARM_EXT_BL and PRIMARY_MAUI".into());
+        let kinds = images.iter().map(|image| image.kind).collect::<Vec<_>>();
+        let embassy = kinds == [1, 0x100];
+        if !embassy && kinds != [1, 2, 0x100] {
+            return Err("Expected one Embassy loader and application, or original BL/EXT_BL and application".into());
         }
         // The physical BL location differs from its RAM load address. Only
         // unchanged original N22 loaders are accepted for a full download.
-        for (image, expected) in images.iter().take(2).zip([
+        for (image, expected) in images.iter().take(if embassy { 0 } else { 2 }).zip([
             "b10cc9bfc364662b97937999cfc444bc689c9612c824ac89c98b69be0a58dd77",
             "e7d49e028cd47eb81e4e29a61ff4b09dcafb5288577aa501556fa5754139c481",
         ]) {
@@ -151,14 +260,58 @@ impl Kit {
                 return Err(format!("{}: original loader checksum mismatch", image.name));
             }
         }
-        if let Ok(info) = fs::read(directory.join("image.json")) {
+        let info = fs::read(directory.join("image.json"));
+        if embassy && info.is_err() {
+            return Err("Embassy kit requires image.json".into());
+        }
+        if let Ok(info) = info {
             let info: serde_json::Value =
                 serde_json::from_slice(&info).map_err(|e| e.to_string())?;
-            let main = &images[2];
+            let main = images.last().unwrap();
             if info["sha256"].as_str() != Some(&format!("{:x}", Sha256::digest(&main.bytes)))
                 || info["bytes"].as_u64() != Some(main.bytes.len() as u64)
             {
                 return Err("Application does not match image.json".into());
+            }
+            if embassy {
+                let loader = &images[0];
+                let metadata = &info["bootloader"];
+                if info["boot_scheme"] != "ekd01-embassy-v1"
+                    || metadata["image"].as_str() != Some(loader.name.as_str())
+                    || metadata["bytes"].as_u64() != Some(loader.bytes.len() as u64)
+                    || metadata["sha256"].as_str()
+                        != Some(format!("{:x}", Sha256::digest(&loader.bytes)).as_str())
+                    || info["boot_layout"]
+                        != serde_json::json!({
+                        "active": [layout::ACTIVE.start, layout::ACTIVE.end],
+                        "dfu": [layout::DFU.start, layout::DFU.end],
+                        "state": [layout::STATE.start, layout::STATE.end]})
+                {
+                    return Err("Custom bootloader/layout does not match image.json".into());
+                }
+                if main.bytes.len() > layout::ACTIVE.len() as usize
+                    || loader.content != 0x140
+                    || loader.jump != 0x140
+                    || loader.attributes != 1
+                    || loader.load + loader.bytes.len() as u32 > layout::BOOT_ROM_END
+                {
+                    return Err("Custom image exceeds boot memory layout".into());
+                }
+                let body = loader
+                    .bytes
+                    .len()
+                    .checked_sub(32)
+                    .ok_or("Missing BootROM checksum")?;
+                if loader.bytes[27] != 1
+                    || le32(&loader.bytes, 44) != 32
+                    || loader.bytes[body..body + 20]
+                        != sha1::Sha1::digest(&loader.bytes[..body])[..]
+                    || loader.bytes[body + 20..] != [0; 12]
+                {
+                    return Err("Invalid BootROM SHA-1 trailer".into());
+                }
+                layout::validate_application(&main.bytes)
+                    .map_err(|e| format!("Invalid application: {e:?}"))?;
             }
         }
         for pair in images.windows(2) {
@@ -166,7 +319,11 @@ impl Kit {
                 return Err("Images overlap".into());
             }
         }
-        Ok(Self { images, scatter })
+        Ok(Self {
+            images,
+            scatter,
+            embassy,
+        })
     }
     pub fn print(&self, bootloaders: bool) {
         println!("Scatter: {}", self.scatter.display());
@@ -185,6 +342,13 @@ impl Kit {
             );
         }
         println!("KEEP  00500000..00800000 settings/filesystem; auxiliary MCU is not accessed");
+        if self.embassy {
+            println!(
+                "RESET {:08X}..{:08X} Embassy rollback state after verified direct download",
+                layout::STATE.start,
+                layout::STATE.end
+            );
+        }
     }
 }
 
@@ -196,4 +360,49 @@ fn checked_in_loaders_have_their_real_flash_locations() {
     assert_eq!(image.physical, 0x27000);
     assert_eq!(image.boot_descriptor().len(), 39);
     assert_eq!(image.content, 0x60);
+    assert_eq!(image.boot_attributes, 0);
+    assert_eq!(&image.boot_descriptor()[12..16], &0u32.to_be_bytes());
+    assert_eq!(&image.boot_descriptor()[35..39], &3u32.to_be_bytes());
+}
+
+#[test]
+fn rom_load_attribute_is_not_the_entry_offset() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+    let image = Image::parse(
+        "BL".into(),
+        fs::read(
+            root.join("firmware/original/EKD01_CAN_BF_BOOTLOADER_V005_MT2502_EKD01_CAN_BF_N22.bin"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(image.boot_attributes, 1);
+    assert_eq!(image.jump, 0x140);
+    assert_eq!(&image.boot_descriptor()[12..16], &1u32.to_be_bytes());
+    let mut metadata = vec![0; 1024];
+    metadata[..8].copy_from_slice(b"SF_BOOT\0");
+    metadata[512..520].copy_from_slice(b"BRLYT\0\0\0");
+    for (at, value) in [
+        (12, 1),
+        (16, 512),
+        (520, 1),
+        (532, 0x42424242),
+        (540, image.physical),
+        (544, image.physical + image.bytes.len() as u32),
+        (548, 1),
+    ] {
+        metadata[at..at + 4].copy_from_slice(&value.to_le_bytes());
+    }
+    metadata[536] = 7;
+    metadata[538..540].copy_from_slice(&1u16.to_le_bytes());
+    let images = [image];
+    assert!(validate_boot_metadata(&metadata, &images).is_ok());
+    // The exact failure captured in the device readback: a valid BL hash,
+    // but BRLYT attributes equal the entry offset and LOAD_BY_BOOTROM is clear.
+    metadata[548..552].copy_from_slice(&0x140u32.to_le_bytes());
+    assert!(
+        validate_boot_metadata(&metadata, &images)
+            .unwrap_err()
+            .contains("attributes=00000140")
+    );
 }

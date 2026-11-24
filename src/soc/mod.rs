@@ -18,13 +18,14 @@ pub mod rtc;
 pub mod time;
 
 use core::fmt;
-use mmio::{read16, write16};
+use mmio::{read16, write16, write32};
 use registers::*;
 
 pub struct Watchdog;
 impl Watchdog {
     pub fn feed() {
-        write16(WDT_RESTART, WDT_RESTART_KEY as u16);
+        // MT6261 DRV_WDT_RETN_REG requires a 32-bit restart transaction.
+        write32(WDT_RESTART, WDT_RESTART_KEY);
     }
 }
 

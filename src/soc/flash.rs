@@ -41,6 +41,8 @@ pub enum FlashError {
 }
 pub struct Flash {
     writable: bool,
+    write_start: u32,
+    write_end: u32,
     pub jedec: u32,
 }
 impl Flash {
@@ -51,7 +53,26 @@ impl Flash {
         let magic = read32(NOR_BASE + 0x50000) & 0xffffff;
         DebugUart::hex("[FLASH] JEDEC", jedec);
         let writable = jedec == NOR_JEDEC_GD25LQ64 && magic == 0x4d4d4d;
-        Self { writable, jedec }
+        Self {
+            writable,
+            write_start: CLAIM,
+            write_end: NOR_BYTES,
+            jedec,
+        }
+    }
+    /// Boot/update code must explicitly select its owned partition. Ordinary
+    /// settings operations retain the original protected write window.
+    pub(crate) fn partition(start: u32, end: u32) -> Result<Self, FlashError> {
+        if start < 0x050000 || start >= end || end > CLAIM || start & 4095 != 0 || end & 4095 != 0 {
+            return Err(FlashError::Range);
+        }
+        let mut flash = Self::initialize();
+        // During an interrupted swap the active GFH may be erased. Boot
+        // recovery must depend on the detected NOR, not on a valid active image.
+        flash.writable = flash.jedec == NOR_JEDEC_GD25LQ64;
+        flash.write_start = start;
+        flash.write_end = end;
+        Ok(flash)
     }
     pub fn available(&self) -> bool {
         self.writable
@@ -66,7 +87,10 @@ impl Flash {
         Ok(())
     }
     fn check_write(&self, offset: u32, size: usize) -> Result<(), FlashError> {
-        if offset < CLAIM || offset > NOR_BYTES || size > (NOR_BYTES - offset) as usize {
+        if offset < self.write_start
+            || offset > self.write_end
+            || size > (self.write_end - offset) as usize
+        {
             return Err(FlashError::Range);
         }
         if !self.writable {
@@ -160,13 +184,19 @@ fn fatal_ram(code: u32) -> ! {
         }
     }
     loop {
-        write16(WDT_RESTART, WDT_RESTART_KEY as u16);
+        write32(WDT_RESTART, WDT_RESTART_KEY);
     }
 }
 
 #[unsafe(link_section = ".ramfunc")]
 #[inline(never)]
-unsafe fn transfer_ram(mode: u32, tx: *const u8, out_len: usize, rx: *mut u8, in_len: usize) {
+pub(crate) unsafe fn transfer_ram(
+    mode: u32,
+    tx: *const u8,
+    out_len: usize,
+    rx: *mut u8,
+    in_len: usize,
+) {
     if out_len > SFI_GPRAM_BYTES || in_len > SFI_GPRAM_BYTES - out_len {
         fatal_ram(8);
     }
@@ -243,7 +273,7 @@ fn ready_ram(mode: u32) -> u8 {
         if status as u32 & NOR_SR1_WIP == 0 {
             return status;
         }
-        write16(WDT_RESTART, WDT_RESTART_KEY as u16);
+        write32(WDT_RESTART, WDT_RESTART_KEY);
     }
     fatal_ram(4)
 }

@@ -1,0 +1,10 @@
+[package]
+name = "ekd01-boot-contract"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dev-dependencies]
+embassy-boot = { path = "../third_party/embassy-boot" }
+embedded-storage = "0.3.1"
+

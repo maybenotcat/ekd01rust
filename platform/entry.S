@@ -19,7 +19,7 @@ reset:
     ldr sp,=__stack_top
     ldr r0,=0xa0030008
     ldr r1,=0x1971
-    strh r1,[r0]
+    str r1,[r0]
     ldr r0,=__ramfunc_load
     ldr r1,=__ramfunc_start
     ldr r2,=__ramfunc_end
@@ -47,6 +47,11 @@ reset:
     str r3,[r1],#4
     subs r2,r2,#4
     bne 4b
+    // Preserve the loader handoff registers through RAM/vector initialization.
+    mov r0,r4
+    mov r1,r5
+    mov r2,r6
+    mov r3,r7
     bl firmware_main
 5:  b 5b
 

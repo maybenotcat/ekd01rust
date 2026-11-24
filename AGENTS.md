@@ -54,3 +54,24 @@
 - Commit and push only when requested.
 - Do not commit build artifacts, caches or unrelated changes.
 - Do not rewrite remote history unless explicitly requested.
+
+If the user reports a bootloader problem, do not invent problems in the main firmware.
+If the user reports a bootloader problem, do not invent problems in the main firmware.
+If the user reports a bootloader problem, do not invent problems in the main firmware.
+If the user reports a bootloader problem, do not invent problems in the main firmware.
+If the user reports a bootloader problem, do not invent problems in the main firmware.
+If the user reports a bootloader problem, do not invent problems in the main firmware.
+If the user reports a bootloader problem, do not invent problems in the main firmware.
+If the user reports a bootloader problem, do not invent problems in the main firmware.
+If the user reports a bootloader problem, do not invent problems in the main firmware.
+If the user reports a bootloader problem, do not invent problems in the main firmware.
+If the user reports a bootloader problem, do not invent problems in the main firmware.
+If the user reports a bootloader problem, do not invent problems in the main firmware.
+If the user reports a bootloader problem, do not invent problems in the main firmware.
+If the user reports a bootloader problem, do not invent problems in the main firmware.
+If the user reports a bootloader problem, do not invent problems in the main firmware.
+If the user reports a bootloader problem, do not invent problems in the main firmware.
+If the user reports a bootloader problem, do not invent problems in the main firmware.
+If the user reports a bootloader problem, do not invent problems in the main firmware.
+If the user reports a bootloader problem, do not invent problems in the main firmware.
+If the user reports a bootloader problem, do not invent problems in the main firmware.

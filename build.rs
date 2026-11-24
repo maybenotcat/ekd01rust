@@ -34,6 +34,8 @@ fn build_identity() {
     for directory in [
         "src",
         "platform",
+        "bootloader",
+        "boot-contract",
         "ui",
         "assets",
         "config",
@@ -83,6 +85,9 @@ fn build_identity() {
 }
 
 fn main() {
+    let script = std::path::PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+        .join("platform/link.ld");
+    println!("cargo:rustc-link-arg=-T{}", script.display());
     build_identity();
     println!("cargo:rerun-if-changed=platform/link.ld");
     println!("cargo:rerun-if-changed=ui/app.slint");

@@ -8,3 +8,5 @@ publish = false
 serialport = { version = "4", default-features = false }
 sha2 = "0.10"
 serde_json = "1"
+sha1 = "0.10"
+ekd01-boot-contract = { path = "../boot-contract" }

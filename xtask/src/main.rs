@@ -2,6 +2,9 @@
 mod build;
 mod elf;
 mod package;
+#[cfg(test)]
+#[path = "../../bootloader/src/sfi_profile.rs"]
+mod sfi_profile;
 
 use std::{
     path::{Path, PathBuf},
@@ -19,7 +22,7 @@ fn run() -> Result<()> {
     if matches!(command.to_str(), Some("help" | "--help" | "-h")) {
         println!(
             "cargo xtask build [--offline] [--out DIRECTORY]\n\
-                  cargo xtask pack [--elf FILE] [--out DIRECTORY] [--identity FILE]\n\n\
+                  cargo xtask pack [--elf FILE] [--boot-elf FILE] [--out DIRECTORY] [--identity FILE]\n\n\
                   build: compile release firmware and create a flash kit\n\
                   pack: package an existing ELF without rebuilding\n\
                   Default kit: target/flash-kit; all paths are relative to the current directory."
@@ -47,6 +50,7 @@ fn run() -> Result<()> {
         })
         .unwrap_or_else(|| root.join("target"));
     let mut elf = target.join("armv5te-none-eabi/release/ekd01rust");
+    let mut boot_elf = target.join("thumbv5te-none-eabi/release/ekd01-bootloader");
     let mut output = target.join("flash-kit");
     let mut identity = root.join("build/generated/build-id.json");
     let mut offline = false;
@@ -55,6 +59,12 @@ fn run() -> Result<()> {
             Some("--offline") if build => offline = true,
             Some("--elf") if !build => {
                 elf = args.next().map(PathBuf::from).ok_or("Missing --elf FILE")?
+            }
+            Some("--boot-elf") if !build => {
+                boot_elf = args
+                    .next()
+                    .map(PathBuf::from)
+                    .ok_or("Missing --boot-elf FILE")?
             }
             Some("--out") => {
                 output = args
@@ -74,7 +84,7 @@ fn run() -> Result<()> {
     if build {
         build::firmware(root, offline)?;
     }
-    package::pack(root, &elf, &output, &identity)
+    package::pack(root, &elf, &boot_elf, &output, &identity)
 }
 fn main() -> ExitCode {
     match run() {

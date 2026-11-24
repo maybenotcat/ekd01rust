@@ -6,6 +6,7 @@ extern crate alloc;
 mod application;
 mod bluetooth;
 mod board;
+mod boot;
 mod crc;
 mod input;
 mod motor;
@@ -26,7 +27,8 @@ include!(concat!(env!("OUT_DIR"), "/build_id.rs"));
 core::arch::global_asm!(include_str!("../platform/entry.S"), options(raw));
 
 #[unsafe(no_mangle)]
-pub extern "C" fn firmware_main() -> ! {
+pub extern "C" fn firmware_main(magic: u32, inverse: u32, version: u32, trial: u32) -> ! {
+    boot::capture_handoff(magic, inverse, version, trial);
     soc::DebugUart::log("[RUST] ENTRY; UART1 115200 inherited\n");
     soc::DebugUart::log("[RUST] BUILD_ID=");
     soc::DebugUart::log(BUILD_ID);
@@ -42,6 +44,7 @@ pub extern "C" fn firmware_main() -> ! {
     soc::memory::Memory::initialize_cache();
     soc::time::Timer::initialize_interrupts();
     soc::time::Timer::enable_irq();
+    soc::time::Timer::verify_progress();
     static EXECUTOR: static_cell::StaticCell<embassy_executor::raw::Executor> =
         static_cell::StaticCell::new();
     let executor = EXECUTOR.init(embassy_executor::raw::Executor::new(core::ptr::null_mut()));
