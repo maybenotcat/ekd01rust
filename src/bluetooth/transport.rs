@@ -26,12 +26,12 @@ impl HciTransport {
     pub fn set_shared_buffers(&mut self, bytes: u16, packets: u16) {
         self.shared_acl = (bytes, packets.min(255) as u8);
     }
-    async fn exact(&self, out: &mut [u8]) -> Result<(), BtifError> {
+    async fn exact(&self, out: &mut [u8]) -> Result<(), TransportError> {
         let mut used = 0;
         while used < out.len() {
             let count = self.io.read(&mut out[used..]).await?;
             if count == 0 {
-                return Err(BtifError::Packet);
+                return Err(TransportError::packet());
             }
             used += count;
         }
@@ -40,25 +40,28 @@ impl HciTransport {
 }
 struct Writer<'a>(&'a Btif);
 impl embedded_io::ErrorType for Writer<'_> {
-    type Error = BtifError;
+    type Error = TransportError;
 }
 impl embedded_io::ErrorType for HciTransport {
-    type Error = BtifError;
+    type Error = TransportError;
 }
 impl embedded_io::ErrorType for &HciTransport {
-    type Error = BtifError;
+    type Error = TransportError;
 }
 impl embedded_io_async::Write for Writer<'_> {
-    async fn write(&mut self, bytes: &[u8]) -> Result<usize, BtifError> {
+    async fn write(&mut self, bytes: &[u8]) -> Result<usize, TransportError> {
         self.0.send(bytes).await?;
         Ok(bytes.len())
     }
-    async fn flush(&mut self) -> Result<(), BtifError> {
+    async fn flush(&mut self) -> Result<(), TransportError> {
         Ok(())
     }
 }
 impl Transport for HciTransport {
-    async fn read<'a, P: PacketToHost<'a>>(&self, buffer: &'a mut [u8]) -> Result<P, BtifError> {
+    async fn read<'a, P: PacketToHost<'a>>(
+        &self,
+        buffer: &'a mut [u8],
+    ) -> Result<P, TransportError> {
         let _guard = self.rx.lock().await;
         let mut indicator = [0; 1];
         self.exact(&mut indicator).await?;
@@ -67,7 +70,7 @@ impl Transport for HciTransport {
             2 => (PacketKind::AclData, 4),
             _ => {
                 crate::soc::DebugUart::hex("[BT] INVALID_H4_INDICATOR", indicator[0] as u32);
-                return Err(BtifError::Packet);
+                return Err(TransportError::packet());
             }
         };
         let mut raw = [0u8; 259];
@@ -78,7 +81,7 @@ impl Transport for HciTransport {
             u16::from_le_bytes([raw[2], raw[3]]) as usize
         };
         if header + length > raw.len() {
-            return Err(BtifError::Packet);
+            return Err(TransportError::packet());
         }
         self.exact(&mut raw[header..header + length]).await?;
         if header == 2 && raw[0] == 0x0e && length >= 4 {
@@ -101,7 +104,7 @@ impl Transport for HciTransport {
             && raw[8] == 0
         {
             if self.shared_acl.0 == 0 || self.shared_acl.1 == 0 {
-                return Err(BtifError::Packet);
+                return Err(TransportError::packet());
             }
             raw[6..8].copy_from_slice(&self.shared_acl.0.to_le_bytes());
             raw[8] = self.shared_acl.1;
@@ -114,10 +117,10 @@ impl Transport for HciTransport {
         P::read_hci(kind, &mut reader, buffer).map_err(|error| {
             use core::fmt::Write;
             let _ = writeln!(crate::soc::DebugUart, "[BT] HCI_PARSE_ERROR: {error:?}");
-            BtifError::Packet
+            TransportError::packet()
         })
     }
-    async fn write<P: PacketToController>(&self, packet: &P) -> Result<(), BtifError> {
+    async fn write<P: PacketToController>(&self, packet: &P) -> Result<(), TransportError> {
         let _guard = self.tx.lock().await;
         if P::KIND as u8 == PacketKind::Cmd as u8 {
             let mut bytes = [0u8; 258];
@@ -147,7 +150,11 @@ impl Transport for HciTransport {
                 }
             }
             self.io.send(&[PacketKind::Cmd as u8]).await?;
-            return self.io.send(&bytes[..length]).await;
+            return self
+                .io
+                .send(&bytes[..length])
+                .await
+                .map_err(TransportError::from);
         }
         self.io.send(&[P::KIND as u8]).await?;
         packet.write_hci_async(Writer(&self.io)).await
@@ -158,18 +165,18 @@ struct PacketWriter<'a> {
     offset: usize,
 }
 impl embedded_io::ErrorType for PacketWriter<'_> {
-    type Error = BtifError;
+    type Error = TransportError;
 }
 impl embedded_io::Write for PacketWriter<'_> {
-    fn write(&mut self, data: &[u8]) -> Result<usize, BtifError> {
+    fn write(&mut self, data: &[u8]) -> Result<usize, TransportError> {
         if data.len() > self.bytes.len() - self.offset {
-            return Err(BtifError::Packet);
+            return Err(TransportError::packet());
         }
         self.bytes[self.offset..self.offset + data.len()].copy_from_slice(data);
         self.offset += data.len();
         Ok(data.len())
     }
-    fn flush(&mut self) -> Result<(), BtifError> {
+    fn flush(&mut self) -> Result<(), TransportError> {
         Ok(())
     }
 }
@@ -178,10 +185,10 @@ struct PacketReader<'a> {
     offset: usize,
 }
 impl embedded_io::ErrorType for PacketReader<'_> {
-    type Error = BtifError;
+    type Error = TransportError;
 }
 impl embedded_io::Read for PacketReader<'_> {
-    fn read(&mut self, out: &mut [u8]) -> Result<usize, BtifError> {
+    fn read(&mut self, out: &mut [u8]) -> Result<usize, TransportError> {
         let size = out.len().min(self.bytes.len() - self.offset);
         out[..size].copy_from_slice(&self.bytes[self.offset..self.offset + size]);
         self.offset += size;
@@ -189,10 +196,42 @@ impl embedded_io::Read for PacketReader<'_> {
     }
 }
 impl Transport for &HciTransport {
-    async fn read<'a, P: PacketToHost<'a>>(&self, buffer: &'a mut [u8]) -> Result<P, BtifError> {
+    async fn read<'a, P: PacketToHost<'a>>(
+        &self,
+        buffer: &'a mut [u8],
+    ) -> Result<P, TransportError> {
         <HciTransport as Transport>::read(*self, buffer).await
     }
-    async fn write<P: PacketToController>(&self, packet: &P) -> Result<(), BtifError> {
+    async fn write<P: PacketToController>(&self, packet: &P) -> Result<(), TransportError> {
         <HciTransport as Transport>::write(*self, packet).await
+    }
+}
+
+#[derive(Debug)]
+pub struct TransportError(BtifError);
+impl TransportError {
+    fn packet() -> Self {
+        Self(BtifError::Packet)
+    }
+}
+impl From<BtifError> for TransportError {
+    fn from(error: BtifError) -> Self {
+        Self(error)
+    }
+}
+impl core::fmt::Display for TransportError {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+impl core::error::Error for TransportError {}
+impl embedded_io::Error for TransportError {
+    fn kind(&self) -> embedded_io::ErrorKind {
+        embedded_io::ErrorKind::Other
+    }
+}
+impl From<bt_hci_transport::ReadHciError<core::convert::Infallible>> for TransportError {
+    fn from(_: bt_hci_transport::ReadHciError<core::convert::Infallible>) -> Self {
+        Self::packet()
     }
 }

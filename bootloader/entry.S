@@ -58,17 +58,3 @@ boot_jump:
     mov r6, #BOOT_HANDOFF_VERSION
     mov r7, r1
     bx r12
-
-.global boot_acquire_irq_mask
-.type boot_acquire_irq_mask,%function
-boot_acquire_irq_mask:
-    mrs r0, cpsr
-    orr r1, r0, #0xc0
-    msr cpsr_c, r1
-    bx lr
-
-.global boot_restore_irq_mask
-.type boot_restore_irq_mask,%function
-boot_restore_irq_mask:
-    msr cpsr_c, r0
-    bx lr

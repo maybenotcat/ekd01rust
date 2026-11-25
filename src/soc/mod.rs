@@ -1,46 +1,54 @@
-pub mod backlight;
-pub mod bridge_uart;
-pub mod btif;
+//! Binary integration and EKD01 policy; peripheral implementations live in the HAL.
 pub mod buttons;
 pub mod critical;
-pub mod display;
 pub mod flash;
-pub mod gpio;
 pub mod memory;
-pub use mt2502_hal::mmio;
-mod panels;
-pub mod pmu;
-use mt2502_hal::pmu::data as pmu_data;
-pub use mt2502_hal::registers;
-mod ring;
-pub mod rtc;
 pub mod time;
+pub use mt2502_hal::{mmio, registers, watchdog::Watchdog};
 
-use core::fmt;
-use mmio::{read16, write16, write32};
-use registers::*;
-
-pub struct Watchdog;
-impl Watchdog {
-    pub fn feed() {
-        // MT6261 DRV_WDT_RETN_REG requires a 32-bit restart transaction.
-        write32(WDT_RESTART, WDT_RESTART_KEY);
+pub struct Environment;
+impl mt2502_hal::environment::Trace for Environment {
+    fn log(text: &str) {
+        DebugUart::log(text);
+    }
+    fn hex(name: &str, value: u32) {
+        DebugUart::hex(name, value);
     }
 }
+impl mt2502_hal::environment::Runtime for Environment {
+    fn now() -> u32 {
+        time::Timer::now()
+    }
+    async fn delay_ticks(ticks: u64) {
+        embassy_time::Timer::after_ticks(ticks).await;
+    }
+}
+pub mod backlight;
+pub mod bridge_uart {
+    pub type BridgeUart = mt2502_hal::uart3::Uart3<super::Environment>;
+}
+pub mod btif {
+    pub type Btif = mt2502_hal::btif::Btif<super::Environment>;
+    pub use mt2502_hal::btif::BtifError;
+}
+pub mod pmu {
+    pub type Pmu = mt2502_hal::pmu::Pmu<super::Environment>;
+}
+pub mod rtc {
+    pub type Rtc = mt2502_hal::rtc::Rtc<super::Environment>;
+    pub use mt2502_hal::rtc::ClockTime;
+}
+pub mod display {
+    pub type Display = mt2502_hal::display::Display<super::Environment>;
+    pub use mt2502_hal::display::{DisplayError, DisplayPins, HEIGHT, WIDTH};
+}
+
+use core::fmt;
 
 pub struct DebugUart;
 impl DebugUart {
     fn put(byte: u8) -> bool {
-        if read16(UART_LCR(UART1_base)) & UART_LCR_DLAB as u16 != 0 {
-            return false;
-        }
-        for _ in 0..100_000 {
-            if read16(UART_LSR(UART1_base)) & UART_LSR_THRE as u16 != 0 {
-                write16(UART_THR(UART1_base), byte as u16);
-                return true;
-            }
-        }
-        false
+        mt2502_hal::debug_uart::Uart1::put(byte)
     }
     pub fn log(text: &str) {
         critical_section::with(|_| {

@@ -1,12 +1,23 @@
-use super::{DebugUart, gpio::Pin, mmio::*, registers::*};
+use super::{gpio::Pin, mmio::*, registers::*};
+use crate::environment::Trace;
+use core::marker::PhantomData;
 
 #[derive(Clone, Copy)]
 pub struct ClockTime {
     pub hour: u8,
     pub minute: u8,
 }
-pub struct Rtc;
-impl Rtc {
+pub struct Rtc<P: Trace> {
+    latch: u32,
+    _environment: PhantomData<P>,
+}
+impl<P: Trace> Rtc<P> {
+    pub const fn new(latch: u32) -> Self {
+        Self {
+            latch,
+            _environment: PhantomData,
+        }
+    }
     fn ready() -> bool {
         (0..100_000).any(|_| read16(RTC_BBPU) as u32 & EKD_RTC_CBUSY == 0)
     }
@@ -78,11 +89,11 @@ impl Rtc {
     }
     pub fn release_power(&mut self) -> bool {
         critical_section::with(|_| {
-            DebugUart::log("[POWER] SHUTDOWN_ENTER\n");
+            P::log("[POWER] SHUTDOWN_ENTER\n");
             if !Self::ready() || !Self::unlock() || !Self::oscillator_shutdown() {
                 return false;
             }
-            let mut latch = unsafe { Pin::claim(crate::board::pins::POWER_LATCH) };
+            let mut latch = unsafe { Pin::claim(self.latch) };
             latch.set(false);
             latch.output();
             latch.mode(0);
@@ -90,7 +101,7 @@ impl Rtc {
             update16(TEST_CON0, EKD_PMU_PWKEY_TRIGGER, 0);
             update16(TEST_CON0, 0, EKD_PMU_PWKEY_TRIGGER);
             update16(TEST_CON0, EKD_PMU_PWKEY_TRIGGER, 0);
-            DebugUart::log("[POWER] RTC_RELEASE; USB may retain power\n");
+            P::log("[POWER] RTC_RELEASE; USB may retain power\n");
             for _ in 0..100_000 {
                 if read16(UART_LSR(UART1_base)) as u32 & UART_LSR_TEMT != 0 {
                     break;

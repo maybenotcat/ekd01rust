@@ -5,6 +5,9 @@ pub struct Pin {
     number: u32,
 }
 impl Pin {
+    /// # Safety
+    /// The pin number must exist on this SoC and be assigned exclusively to
+    /// this owner. The board must not create another owner of the same pad.
     pub const unsafe fn claim(number: u32) -> Self {
         Self { number }
     }

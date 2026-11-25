@@ -3174,6 +3174,7 @@ name = "mt2502-hal"
 version = "0.1.0"
 dependencies = [
  "critical-section",
+ "embedded-io",
  "embedded-storage",
 ]
 
@@ -6736,6 +6737,7 @@ name = "xtask"
 version = "0.1.0"
 dependencies = [
  "ekd01-boot-contract",
+ "mt2502-hal",
  "serde_json",
  "sha1",
  "sha2",

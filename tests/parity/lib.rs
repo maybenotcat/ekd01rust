@@ -1,5 +1,7 @@
 //! Native source-level checks. The NOR backend is substituted; no CPU is emulated.
 extern crate alloc;
+#[path = "../../src/board.rs"]
+pub mod board;
 
 pub use mt2502_hal::flash::geometry as nor_geometry;
 
@@ -110,7 +112,7 @@ pub mod soc {
         }
         pub struct BridgeUart;
         impl BridgeUart {
-            pub fn initialize() -> Self {
+            pub fn initialize(_rx: u32, _tx: u32) -> Self {
                 Self
             }
             pub fn receive(&mut self) -> Option<u8> {

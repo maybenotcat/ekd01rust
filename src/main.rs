@@ -86,12 +86,11 @@ pub extern "C" fn fault_report(kind: u32, lr: u32, status: u32) -> ! {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn irq_dispatch() {
-    use soc::{mmio::read32, registers::*};
-    let status = read32(IRQ_STA2);
-    if status & IRQ_STA2_INVALID != 0 {
+    use soc::registers::*;
+    let Some(line) = mt2502_hal::interrupt::pending() else {
         return;
-    }
-    match status & IRQ_STA2_LINE_MASK {
+    };
+    match line {
         EKD_IRQ_GPT_LINE => soc::time::Timer::acknowledge(),
         EKD_IRQ_UART3_LINE => soc::bridge_uart::BridgeUart::irq(),
         EKD_IRQ_BTIF_LINE => soc::btif::Btif::irq(),

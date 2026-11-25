@@ -3,19 +3,10 @@ struct Armv5CriticalSection;
 critical_section::set_impl!(Armv5CriticalSection);
 unsafe impl critical_section::Impl for Armv5CriticalSection {
     unsafe fn acquire() -> u32 {
-        let saved: u32;
-        let masked: u32;
-        unsafe {
-            core::arch::asm!("mrs {saved}, cpsr", "orr {masked}, {saved}, #0xc0", "msr cpsr_c, {masked}",
-            saved = out(reg) saved, masked = out(reg) masked, options(nostack));
-        }
-        let _ = masked;
-        saved
+        unsafe { mt2502_hal::cpu::acquire_irq_mask() }
     }
     unsafe fn release(saved: u32) {
-        unsafe {
-            core::arch::asm!("msr cpsr_c, {saved}", saved = in(reg) saved, options(nostack));
-        }
+        unsafe { mt2502_hal::cpu::restore_irq_mask(saved) }
     }
 }
 
@@ -29,7 +20,5 @@ pub extern "C" fn __sync_synchronize() {
     // Calling that intrinsic here would recurse until the stack corrupts RAM.
     // An opaque asm block has a compiler memory clobber without requesting
     // another fence intrinsic or an unsupported CPU barrier instruction.
-    unsafe {
-        core::arch::asm!("", options(nostack, preserves_flags));
-    }
+    mt2502_hal::cpu::compiler_barrier();
 }

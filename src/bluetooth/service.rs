@@ -140,7 +140,7 @@ pub async fn run(bus: FlashBus) -> ! {
                     select(requests, notifications).await;
                 }
                 #[allow(unreachable_code)]
-                Ok::<(), trouble_host::BleHostError<crate::soc::btif::BtifError>>(())
+                Ok::<(), trouble_host::BleHostError<super::transport::TransportError>>(())
             };
             match select(wait_disabled(), select(runner.run(), application)).await {
                 Either::First(()) => {

@@ -1,10 +1,10 @@
 #![no_std]
 #![no_main]
 
-mod emi;
-mod rtc;
-mod sfi;
-mod sfi_profile;
+type Emi = mt2502_hal::boot::emi::Emi<soc::Environment>;
+type RtcBoot = mt2502_hal::boot::rtc::RtcBoot<soc::Environment>;
+type Sfi = mt2502_hal::boot::sfi::Sfi<soc::Environment>;
+
 mod soc;
 mod storage;
 
@@ -25,7 +25,7 @@ pub fn stop(message: &str) -> ! {
     DebugUart::log(message);
     // Keep the error readable. Recovery remains the physical BootROM USB path.
     loop {
-        soc::feed_watchdog();
+        mt2502_hal::watchdog::Watchdog::feed();
     }
 }
 
@@ -49,28 +49,28 @@ extern "C" fn boot_main(parameters: u32) -> ! {
     let usb_boot = parameters & 3 == 0
         && (0x7000_0000..0x7000_5758).contains(&parameters)
         && soc::mmio::read32(parameters + 2216) & 2 != 0;
-    soc::initialize_clocks(usb_boot);
-    soc::initialize_uart();
+    soc::Hardware::initialize_clocks(usb_boot);
+    soc::Hardware::initialize_uart();
     DebugUart::log("[BOOT] EKD01 EMBASSY; single loader; UART1 115200\n");
     DebugUart::log("[BOOT] BUILD_ID=");
     DebugUart::log(BUILD_ID);
     DebugUart::log("\n");
-    emi::initialize();
-    rtc::initialize_oscillator();
-    soc::stabilize_32k();
+    Emi::initialize();
+    RtcBoot::initialize_oscillator();
+    soc::Hardware::stabilize_32k();
     DebugUart::hex(
         "[BOOT] EMI_GENA",
         soc::mmio::read32(soc::registers::EMI_GENA),
     );
-    if !soc::probe_psram() {
+    if !soc::Hardware::probe_psram([0x00100000, 0x00300000, 0x006efffc]) {
         stop("[BOOT] PSRAM_PROBE_FAILED\n");
     }
     DebugUart::log("[BOOT] PSRAM_OK\n");
-    soc::prepare_runtime();
-    sfi::initialize();
-    soc::initialize_power();
-    soc::release_usb_download_power();
-    soc::latch_power();
+    soc::Hardware::prepare_runtime(0x70006140);
+    Sfi::initialize();
+    soc::Hardware::initialize_power();
+    soc::Hardware::release_usb_download_power();
+    soc::Hardware::latch_power();
     // Exclusive physical owner; all three Embassy Boot views borrow this device.
     let controller = unsafe { soc::flash::FlashController::attach() };
     DebugUart::hex("[FLASH] JEDEC", controller.jedec().unwrap_or(0));
@@ -99,8 +99,8 @@ extern "C" fn boot_main(parameters: u32) -> ! {
         stop("[BOOT] INVALID_APPLICATION\n");
     }
     DebugUart::hex("[BOOT] JUMP", layout::APPLICATION_ENTRY);
-    soc::finish_handoff();
-    soc::arm_application_watchdog();
+    soc::Hardware::finish_handoff();
+    soc::Hardware::arm_application_watchdog();
     unsafe extern "C" {
         fn boot_jump(entry: u32, trial: u32) -> !;
     }

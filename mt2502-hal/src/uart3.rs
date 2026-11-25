@@ -1,16 +1,19 @@
-use super::{DebugUart, gpio::Pin, mmio::*, registers::*, ring::RxRing};
-use crate::board::pins;
+use super::{gpio::Pin, mmio::*, registers::*, ring::RxRing};
+use crate::environment::Trace;
+use core::marker::PhantomData;
+
 // Embassy rendering is cooperative. Buffer beyond one C task timeslice without
 // dropping a burst while Slint finishes a synchronous raster operation.
 static RX: RxRing<8192> = RxRing::new();
-pub struct BridgeUart {
+pub struct Uart3<P: Trace> {
+    _environment: PhantomData<P>,
     _rx: Pin,
     _tx: Pin,
 }
-impl BridgeUart {
-    pub fn initialize() -> Self {
-        let mut rx = unsafe { Pin::claim(pins::MCU_RX) };
-        let mut tx = unsafe { Pin::claim(pins::MCU_TX) };
+impl<P: Trace> Uart3<P> {
+    pub fn initialize(rx_pin: u32, tx_pin: u32) -> Self {
+        let mut rx = unsafe { Pin::claim(rx_pin) };
+        let mut tx = unsafe { Pin::claim(tx_pin) };
         critical_section::with(|_| {
             write32(IRQ_MASK_SET0, 1 << EKD_IRQ_UART3_LINE);
             write32(DRVPDN_CON1_CLR, EKD_PDN_UART3);
@@ -51,8 +54,12 @@ impl BridgeUart {
             write16(UART_IER(b), (UART_IER_ERBFI | UART_IER_ELSI) as u16);
             write32(IRQ_MASK_CLR0, 1 << EKD_IRQ_UART3_LINE);
         });
-        DebugUart::log("[BRIDGE] UART3 230400; IRQ29; MCU retained\n");
-        Self { _rx: rx, _tx: tx }
+        P::log("[BRIDGE] UART3 230400; IRQ29; MCU retained\n");
+        Self {
+            _environment: PhantomData,
+            _rx: rx,
+            _tx: tx,
+        }
     }
     pub fn irq() {
         for _ in 0..128 {

@@ -3,8 +3,7 @@ mod build;
 mod elf;
 mod package;
 #[cfg(test)]
-#[path = "../../bootloader/src/sfi_profile.rs"]
-mod sfi_profile;
+use mt2502_hal::flash::gd25lq64_profile as sfi_profile;
 
 use std::{
     path::{Path, PathBuf},

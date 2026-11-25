@@ -1,5 +1,14 @@
-use super::{DebugUart, gpio::Pin, mmio::*, panels::PANELS, pmu::Pmu, registers::*, time::Timer};
-use crate::board::pins;
+use super::{gpio::Pin, mmio::*, panels::PANELS, pmu::Pmu, registers::*};
+use crate::environment::Runtime;
+use core::marker::PhantomData;
+
+#[derive(Clone, Copy)]
+pub struct DisplayPins {
+    pub reset: u32,
+    pub cs: u32,
+    pub clock: u32,
+    pub bus: [u32; 3],
+}
 pub const WIDTH: usize = 320;
 pub const HEIGHT: usize = 240;
 
@@ -11,7 +20,8 @@ pub enum DisplayError {
     DmaTimeout,
     Disabled,
 }
-pub struct Display {
+pub struct Display<P: Runtime> {
+    _environment: PhantomData<P>,
     reset: Pin,
     cs: Pin,
     clock: Pin,
@@ -19,15 +29,17 @@ pub struct Display {
     failed: bool,
     first_transfer: bool,
 }
-impl Display {
-    pub async fn initialize(pmu: &mut Pmu) -> Result<Self, DisplayError> {
-        DebugUart::log("[LCD] INIT_ENTER\n");
+impl<P: Runtime> Display<P> {
+    pub async fn initialize(pmu: &mut Pmu<P>, pins: DisplayPins) -> Result<Self, DisplayError> {
+        P::log("[LCD] INIT_ENTER\n");
         let mut display = unsafe {
             Self {
-                reset: Pin::claim(pins::LCD_RESET),
-                cs: Pin::claim(pins::LCD_CS),
-                clock: Pin::claim(pins::LCD_CLOCK),
-                _bus: pins::LCD_OTHER_BUS.map(|number| Pin::claim(number)),
+                _environment: PhantomData,
+
+                reset: Pin::claim(pins.reset),
+                cs: Pin::claim(pins.cs),
+                clock: Pin::claim(pins.clock),
+                _bus: pins.bus.map(|number| Pin::claim(number)),
                 failed: false,
                 first_transfer: true,
             }
@@ -48,8 +60,8 @@ impl Display {
         display.clock.mode(1);
         write32(DRVPDN_CON0_CLR, EKD_PDN_LCD_CLOCKS);
         pmu.enable_lcd_supply();
-        Timer::delay_ms(20).await;
-        DebugUart::log("[LCD] SUPPLY_SETTLED; BUS_INIT_ENTER\n");
+        P::delay_ms(20).await;
+        P::log("[LCD] SUPPLY_SETTLED; BUS_INIT_ENTER\n");
         update32(
             LCD_GMCCON_REG,
             LCD_GMC_THROTTLE_BURST_MASK,
@@ -72,9 +84,9 @@ impl Display {
             EKD_LCD_PAD_DRIVE_MASK,
             EKD_LCD_PAD_DRIVE_VALUE,
         );
-        DebugUart::log("[LCD] BUS_INIT_EXIT; READ_ID_ENTER\n");
+        P::log("[LCD] BUS_INIT_EXIT; READ_ID_ENTER\n");
         let id = display.read_id().await;
-        DebugUart::hex("[LCD] ID", id);
+        P::hex("[LCD] ID", id);
         let middle = (id >> 8) & 0xffff;
         let first = id >> 16;
         let profile = if middle == 0x8552 {
@@ -92,8 +104,8 @@ impl Display {
         } else {
             return Err(DisplayError::UnknownPanel(id));
         };
-        DebugUart::log(PANELS[profile].name);
-        DebugUart::log("\n");
+        P::log(PANELS[profile].name);
+        P::log("\n");
         let mut command = 0;
         let mut native = 0xd0u8;
         for &(op, width, value, count) in PANELS[profile].ops {
@@ -115,7 +127,7 @@ impl Display {
                 }
                 2 => display.reset.set(value != 0),
                 3 => display.cs.set(value != 0),
-                4 => Timer::delay_ms(value as u64).await,
+                4 => P::delay_ms(value as u64).await,
                 5 => {
                     display.window(0, 0, 239, 319);
                     display.cs.set(false);
@@ -144,8 +156,8 @@ impl Display {
         display.command(DCS_SET_ADDRESS_MODE as u8);
         display.datum(orientation);
         display.window(0, 0, 319, 239);
-        DebugUart::hex("[LCD] LANDSCAPE_MADCTL", orientation as u32);
-        DebugUart::log("[LCD] PANEL_INIT_EXIT\n");
+        P::hex("[LCD] LANDSCAPE_MADCTL", orientation as u32);
+        P::log("[LCD] PANEL_INIT_EXIT\n");
         Ok(display)
     }
     fn settle() {
@@ -189,11 +201,11 @@ impl Display {
     }
     async fn read_id(&mut self) -> u32 {
         self.reset.set(true);
-        Timer::delay_ms(200).await;
+        P::delay_ms(200).await;
         self.reset.set(false);
-        Timer::delay_ms(10).await;
+        P::delay_ms(10).await;
         self.reset.set(true);
-        Timer::delay_ms(120).await;
+        P::delay_ms(120).await;
         self.cs.set(false);
         self.bus_write(false, DCS_READ_DISPLAY_ID as u16, 2);
         self.clock.mode(0);
@@ -206,7 +218,7 @@ impl Display {
             id = (id << 8) | read8(LCD_SERIAL_DATA0_REG) as u32;
         }
         self.cs.set(true);
-        Timer::delay_ms(1).await;
+        P::delay_ms(1).await;
         id
     }
     fn window(&mut self, x0: u16, y0: u16, x1: u16, y1: u16) {
@@ -233,7 +245,7 @@ impl Display {
     fn fail(&mut self, error: DisplayError) -> Result<(), DisplayError> {
         self.stop_dma();
         self.failed = true;
-        DebugUart::hex("[LCD] DMA_STATUS", read16(LCD_STA_REG) as u32);
+        P::hex("[LCD] DMA_STATUS", read16(LCD_STA_REG) as u32);
         Err(error)
     }
     pub async fn present(&mut self, pixels: &[u16], region: [u16; 4]) -> Result<(), DisplayError> {
@@ -244,14 +256,11 @@ impl Display {
         let address = pixels.as_ptr() as u32;
         let trace = core::mem::replace(&mut self.first_transfer, false);
         if trace {
-            let cpsr: u32;
-            unsafe {
-                core::arch::asm!("mrs {value}, cpsr", value=out(reg) cpsr, options(nomem, nostack, preserves_flags));
-            }
-            DebugUart::hex("[LCD] DMA_ENTER_CPSR", cpsr);
-            DebugUart::hex("[LCD] DMA_ENTER_STATUS", read16(LCD_STA_REG) as u32);
-            DebugUart::hex("[LCD] DMA_REGION_BEGIN", (y0 as u32) << 16 | x0 as u32);
-            DebugUart::hex("[LCD] DMA_REGION_END", (y1 as u32) << 16 | x1 as u32);
+            let cpsr = crate::cpu::status();
+            P::hex("[LCD] DMA_ENTER_CPSR", cpsr);
+            P::hex("[LCD] DMA_ENTER_STATUS", read16(LCD_STA_REG) as u32);
+            P::hex("[LCD] DMA_REGION_BEGIN", (y0 as u32) << 16 | x0 as u32);
+            P::hex("[LCD] DMA_REGION_END", (y1 as u32) << 16 | x1 as u32);
         }
         if pixels.len() != WIDTH * HEIGHT
             || address & EKD_LCD_FRAME_ALIGNMENT_MASK != 0
@@ -262,24 +271,24 @@ impl Display {
             || x1 >= WIDTH as u16
             || y1 >= HEIGHT as u16
         {
-            DebugUart::hex("[LCD] FRAMEBUFFER_ADDRESS", address);
-            DebugUart::hex("[LCD] FRAMEBUFFER_PIXELS", pixels.len() as u32);
-            DebugUart::hex("[LCD] REGION_BEGIN", (y0 as u32) << 16 | x0 as u32);
-            DebugUart::hex("[LCD] REGION_END", (y1 as u32) << 16 | x1 as u32);
+            P::hex("[LCD] FRAMEBUFFER_ADDRESS", address);
+            P::hex("[LCD] FRAMEBUFFER_PIXELS", pixels.len() as u32);
+            P::hex("[LCD] REGION_BEGIN", (y0 as u32) << 16 | x0 as u32);
+            P::hex("[LCD] REGION_END", (y1 as u32) << 16 | x1 as u32);
             return self.fail(DisplayError::Framebuffer);
         }
-        let started = Timer::now();
+        let started = P::now();
         if trace {
-            DebugUart::hex("[LCD] DMA_IDLE_WAIT_TICK", started);
+            P::hex("[LCD] DMA_IDLE_WAIT_TICK", started);
         }
         while read16(LCD_STA_REG) as u32 & (LCD_STATUS_RUN_BIT | LCD_STATUS_BUSY_BIT) != 0 {
-            if Timer::now().wrapping_sub(started) >= EKD_LCD_DMA_TIMEOUT_TICKS {
+            if P::now().wrapping_sub(started) >= EKD_LCD_DMA_TIMEOUT_TICKS {
                 return self.fail(DisplayError::DmaIdle);
             }
-            embassy_time::Timer::after_ticks(1).await;
+            P::delay_ticks(1).await;
         }
         if trace {
-            DebugUart::log("[LCD] DMA_IDLE_READY\n");
+            P::log("[LCD] DMA_IDLE_READY\n");
         }
         write32(DRVPDN_CON0_CLR, EKD_PDN_LCD_CLOCKS);
         write32(IRQ_MASK_SET0, 1 << EKD_IRQ_LCD_LINE);
@@ -289,7 +298,7 @@ impl Display {
         write32(LCD_TECON_REG, 0);
         self.window(x0, y0, x1, y1);
         if trace {
-            DebugUart::log("[LCD] DMA_WINDOW_READY\n");
+            P::log("[LCD] DMA_WINDOW_READY\n");
         }
         write32(
             LCD_ROI_CTRL_REG,
@@ -323,7 +332,7 @@ impl Display {
         write32(LCD_LAYER0_MEM_OFFSET_REG, 0);
         write32(LCD_LAYER0_MEM_PITCH_REG, (WIDTH * 2) as u32);
         if trace {
-            DebugUart::log("[LCD] DMA_REGISTERS_READY\n");
+            P::log("[LCD] DMA_REGISTERS_READY\n");
         }
         core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
         unsafe {
@@ -332,13 +341,13 @@ impl Display {
         let _ = read32(LCD_LAYER0_BUFF_ADDR_REG);
         self.cs.set(false);
         let _ = read16(LCD_INT_STATUS_REG);
-        let started = Timer::now();
+        let started = P::now();
         write16(LCD_START_REG, 0);
         write16(LCD_START_REG, LCD_START_BIT as u16);
         let _ = read16(LCD_START_REG);
         if trace {
-            DebugUart::hex("[LCD] DMA_STARTED_STATUS", read16(LCD_STA_REG) as u32);
-            DebugUart::hex("[LCD] DMA_STARTED_TICK", Timer::now());
+            P::hex("[LCD] DMA_STARTED_STATUS", read16(LCD_STA_REG) as u32);
+            P::hex("[LCD] DMA_STARTED_TICK", P::now());
         }
         let mut saw_run = false;
         let mut complete = false;
@@ -350,10 +359,10 @@ impl Display {
             if (complete || saw_run) && !running {
                 break;
             }
-            if Timer::now().wrapping_sub(started) >= EKD_LCD_DMA_TIMEOUT_TICKS {
+            if P::now().wrapping_sub(started) >= EKD_LCD_DMA_TIMEOUT_TICKS {
                 return self.fail(DisplayError::DmaTimeout);
             }
-            embassy_time::Timer::after_ticks(1).await;
+            P::delay_ticks(1).await;
         }
         self.stop_dma();
         write32(IRQ_EOIOH0, 1 << EKD_IRQ_LCD_LINE);

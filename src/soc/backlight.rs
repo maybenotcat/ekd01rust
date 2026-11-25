@@ -1,13 +1,30 @@
-use super::{DebugUart, gpio::Pin, mmio::*, registers::*};
+//! EKD01 N22 backlight wiring and brightness policy.
+use super::DebugUart;
 use crate::board::pins;
+use mt2502_hal::{
+    gpio::Pin,
+    pmu::isink::{CONFIGURATION_24MA_PWM, Channel, CurrentSinks},
+    pwm::{CONTROL_DIVIDE_BY_8, Configuration, Pwm3, Pwm4},
+};
+
+// Board-specific period, startup state and five brightness levels.
+const PERIOD_COUNT: u16 = 80;
+const DEFAULT_DUTY: u16 = 29;
+const DUTY_STEPS: u32 = 81;
+const BRIGHTNESS_STEP_PERCENT: u32 = 12;
+const LEGACY_PWM3_CONTROL: u16 = 7;
 
 pub struct Backlight {
     _gates: [Pin; 2],
-    _pwm: Pin,
+    _pwm_pin: Pin,
+    _legacy_pwm: Pwm3,
+    _sinks: CurrentSinks,
+    pwm: Pwm4,
     level: u8,
 }
 impl Backlight {
     pub fn initialize() -> Self {
+        // Board assigns these pads and peripherals once, after PMU initialization.
         let mut gates = unsafe { pins::BACKLIGHT_GATES.map(|number| Pin::claim(number)) };
         for gate in &mut gates {
             gate.set(true);
@@ -15,41 +32,47 @@ impl Backlight {
             gate.mode(0);
             gate.disable_pull();
         }
-        let mut pwm = unsafe { Pin::claim(pins::BACKLIGHT_PWM) };
-        pwm.input();
-        pwm.disable_pull();
-        pwm.mode(2);
+        let mut pwm_pin = unsafe { Pin::claim(pins::BACKLIGHT_PWM) };
+        pwm_pin.input();
+        pwm_pin.disable_pull();
+        pwm_pin.mode(2);
+        let mut pwm = unsafe { Pwm4::claim() };
+        let mut legacy_pwm = unsafe { Pwm3::claim() };
+        let mut sinks = unsafe { CurrentSinks::claim() };
         critical_section::with(|_| {
-            write16(EKD_ADIE_CLOCK_CLEAR, EKD_ADIE_ISINK_26M as u16);
-            update16(ISINKS_CON0, ISINKS_MODE_MASK, 0);
-            update16(ISINK0_CON0, EKD_ISINK_CONFIG_MASK, EKD_ISINK_24MA_PWM);
-            update16(ISINK1_CON0, EKD_ISINK_CONFIG_MASK, EKD_ISINK_24MA_PWM);
-            write16(EKD_PWM3_CTRL, EKD_PWM3_CLOCK_QUERY_DEFAULT as u16);
-            write16(PWM4_CTRL, EKD_PWM4_DIV8_CONTROL as u16);
-            write16(PWM4_COUNT, EKD_PWM4_20KHZ_COUNT as u16);
-            write16(PWM4_DUTY, EKD_PWM4_DEFAULT_DUTY as u16);
-            write32(DRVPDN_CON2_CLR, EKD_PDN_PWM4);
-            update16(ISINK0_CON0, 0, ISINK_EN_MASK);
-            update16(ISINK1_CON0, 0, ISINK_EN_MASK);
+            // Preserve the tested N22 sequence across PMU and PWM peripherals.
+            sinks.enable_26mhz_clock();
+            sinks.set_mode(0);
+            sinks.configure(Channel::Zero, CONFIGURATION_24MA_PWM);
+            sinks.configure(Channel::One, CONFIGURATION_24MA_PWM);
+            legacy_pwm.set_control(LEGACY_PWM3_CONTROL);
+            pwm.configure(Configuration {
+                control: CONTROL_DIVIDE_BY_8,
+                period_count: PERIOD_COUNT,
+                duty_count: DEFAULT_DUTY,
+            });
+            pwm.enable_clock();
+            sinks.enable(Channel::Zero);
+            sinks.enable(Channel::One);
         });
         DebugUart::log("[LCD] BACKLIGHT_PWM4_GPIO19\n");
         Self {
             _gates: gates,
-            _pwm: pwm,
+            _pwm_pin: pwm_pin,
+            _legacy_pwm: legacy_pwm,
+            _sinks: sinks,
+            pwm,
             level: 3,
         }
     }
     pub fn set_level(&mut self, level: u8) {
         if (1..=5).contains(&level) {
-            write16(
-                PWM4_DUTY,
-                (EKD_PWM4_DUTY_STEPS * EKD_PWM4_BRIGHTNESS_STEP_PERCENT * level as u32 / 100)
-                    as u16,
-            );
+            self.pwm
+                .set_duty((DUTY_STEPS * BRIGHTNESS_STEP_PERCENT * level as u32 / 100) as u16);
             self.level = level;
         }
     }
     pub fn off(&mut self) {
-        write16(PWM4_DUTY, 0);
+        self.pwm.set_duty(0);
     }
 }

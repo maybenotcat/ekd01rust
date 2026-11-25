@@ -1,4 +1,6 @@
-use super::{DebugUart, mmio::*, registers::*, ring::RxRing, time::Timer};
+use super::{mmio::*, registers::*, ring::RxRing};
+use crate::environment::Runtime;
+use core::marker::PhantomData;
 static RX: RxRing<8192> = RxRing::new();
 const IRQ_BIT: u32 = 1 << (EKD_IRQ_BTIF_LINE - 32);
 #[derive(Clone, Copy, Debug)]
@@ -14,33 +16,32 @@ impl core::fmt::Display for BtifError {
     }
 }
 impl core::error::Error for BtifError {}
-impl From<bt_hci_transport::ReadHciError<core::convert::Infallible>> for BtifError {
-    fn from(_: bt_hci_transport::ReadHciError<core::convert::Infallible>) -> Self {
-        Self::Packet
-    }
-}
 impl embedded_io::Error for BtifError {
     fn kind(&self) -> embedded_io::ErrorKind {
         embedded_io::ErrorKind::Other
     }
 }
 
-pub struct Btif {
+pub struct Btif<P: Runtime> {
+    _environment: PhantomData<P>,
     opened: bool,
 }
-impl Btif {
+impl<P: Runtime> Btif<P> {
     pub async fn open() -> Result<Self, BtifError> {
         RX.clear();
         write32(IRQ_MASK_SET1, IRQ_BIT);
         write32(DRVPDN_CON0_CLR, EKD_PDN_BT_CLOCKS);
         update32(EKD_BT_POWER_CON1, 0, EKD_BT_POWER_ON);
-        embassy_time::Timer::after_ticks(1).await;
+        P::delay_ticks(1).await;
         write32(DRVPDN_CON2_CLR, EKD_PDN_BTIF);
-        embassy_time::Timer::after_ticks(1).await;
+        P::delay_ticks(1).await;
         write16(BTIF_IER_ADDR, 0);
         write16(BTIF_DMA_EN_ADDR, 0);
         write16(BTIF_SLEEP_EN_ADDR, 0);
-        let mut btif = Self { opened: true };
+        let mut btif = Self {
+            opened: true,
+            _environment: PhantomData,
+        };
         if read16(BTIF_LSR_ADDR) == 0xffff {
             btif.close().await;
             return Err(BtifError::Offline);
@@ -60,7 +61,7 @@ impl Btif {
         write32(IRQ_EOIOH1, IRQ_BIT);
         write16(BTIF_IER_ADDR, BTIF_IER_RXEN as u16);
         write32(IRQ_MASK_CLR1, IRQ_BIT);
-        DebugUart::log("[BTIF] OPEN; internal FIFO IRQ43\n");
+        P::log("[BTIF] OPEN; internal FIFO IRQ43\n");
         Ok(btif)
     }
     pub async fn close(&mut self) {
@@ -70,7 +71,7 @@ impl Btif {
             write32(IRQ_EOIOH1, IRQ_BIT);
             write32(DRVPDN_CON2_SET, EKD_PDN_BTIF);
             write32(DRVPDN_CON0_SET, EKD_PDN_BT_ARM7);
-            embassy_time::Timer::after_ticks(1).await;
+            P::delay_ticks(1).await;
             write32(DRVPDN_CON0_SET, EKD_PDN_BT_BUS_26M);
             update32(EKD_BT_POWER_CON1, EKD_BT_POWER_OFF_MASK, 0);
         }
@@ -106,7 +107,7 @@ impl Btif {
         if !self.opened {
             return Err(BtifError::Offline);
         }
-        let started = Timer::now();
+        let started = P::now();
         for byte in bytes {
             loop {
                 let mut ready = false;
@@ -121,10 +122,10 @@ impl Btif {
                     let _ = read16(GPIO_DIR0);
                     break;
                 }
-                if Timer::now().wrapping_sub(started) >= 128 {
+                if P::now().wrapping_sub(started) >= 128 {
                     return Err(BtifError::Timeout);
                 }
-                embassy_time::Timer::after_ticks(1).await;
+                P::delay_ticks(1).await;
             }
         }
         Ok(())
