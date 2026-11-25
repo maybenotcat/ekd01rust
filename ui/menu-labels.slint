@@ -3,6 +3,7 @@ import { MenuItem, MenuPage } from "types.slint";
 export global MenuText {
     // Group labels by settings domain instead of one deeply nested chain.
     public pure function label(item: MenuItem, russian: bool) -> string {
+        if (item == MenuItem.about) { return russian ? "О программе" : "About"; }
         if (
             item == MenuItem.display ||
             item == MenuItem.motor ||

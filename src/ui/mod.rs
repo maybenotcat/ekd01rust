@@ -73,6 +73,9 @@ impl UserInterface {
         .expect("install Slint platform once");
         window.set_size(PhysicalSize::new(WIDTH as u32, HEIGHT as u32));
         let component = Dashboard::new()?;
+        component.set_build_id(crate::BUILD_ID.into());
+        component.set_git_commit(env!("EKD01_GIT_COMMIT").into());
+        component.set_git_modified(env!("EKD01_GIT_MODIFIED") == "true");
         let statistics = Rc::new(slint::VecModel::default());
         let menu_items = Rc::new(slint::VecModel::default());
         component.set_statistics(statistics.clone().into());

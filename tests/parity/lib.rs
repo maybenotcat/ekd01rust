@@ -1,5 +1,49 @@
 //! Native source-level checks. The NOR backend is substituted; no CPU is emulated.
 extern crate alloc;
+
+#[cfg(test)]
+#[allow(dead_code)]
+#[path = "../../build-support/revision.rs"]
+mod revision;
+
+#[test]
+fn about_page_is_read_only_and_power_returns_to_settings() {
+    use input::ButtonEvents;
+    use ui::{
+        data::Item,
+        model::{Actions, Page, UiModel, View},
+    };
+    let mut model = UiModel::new(preferences::Preferences::default());
+    model.navigation.view = View::Menu;
+    model.enter(Page::Root);
+    model.navigation.selected = (0..model.count())
+        .find(|index| model.item(*index) == Item::About)
+        .unwrap();
+    let power = ButtonEvents {
+        short: 4,
+        released: 4,
+        ..Default::default()
+    };
+    let actions = model.step(power, 1);
+    assert_eq!(model.navigation.view, View::Information);
+    assert_eq!(model.navigation.info_page, Some(Item::About));
+    assert!(!model.navigation.editing);
+    assert!(!actions.intersects(Actions::SAVE | Actions::MOTOR_APPLY | Actions::ADV_APPLY));
+    assert!(
+        model
+            .step(
+                ButtonEvents {
+                    pressed: 1,
+                    ..Default::default()
+                },
+                2
+            )
+            .is_empty()
+    );
+    model.step(power, 3);
+    assert_eq!(model.navigation.view, View::Menu);
+    assert_eq!(model.item(model.navigation.selected), Item::About);
+}
 #[path = "../../src/board.rs"]
 pub mod board;
 
@@ -57,10 +101,10 @@ fn controller_patch_matches_working_c_payload_without_file_header() {
 pub mod crc;
 #[path = "../../src/input.rs"]
 pub mod input;
-#[path = "../../src/preferences.rs"]
-pub mod preferences;
 #[path = "../../src/odometer.rs"]
 pub mod odometer;
+#[path = "../../src/preferences.rs"]
+pub mod preferences;
 #[path = "../../src/protocol.rs"]
 pub mod protocol;
 #[path = "../../src/storage.rs"]
@@ -275,7 +319,10 @@ mod checks {
             [0xc4, 9, 0xa0, 1, 0x1a, 8, 0, 0]
         );
         assert!(CanFrame::controls(5, 6, false, true, 0).is_none());
-        assert!(CanFrame::basic_settings(protocol::basic_bounds::LIMIT_MAX_X100 + 1, 260, 2074).is_none());
+        assert!(
+            CanFrame::basic_settings(protocol::basic_bounds::LIMIT_MAX_X100 + 1, 260, 2074)
+                .is_none()
+        );
     }
     #[test]
     fn bridge_delimiters_resynchronization_and_gap() {

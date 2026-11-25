@@ -64,7 +64,15 @@ impl Page {
     fn items(self) -> &'static [Item] {
         use Item::*;
         match self {
-            Self::Root => &[Display, Motor, Information, Bluetooth, FactoryReset, Exit],
+            Self::Root => &[
+                Display,
+                Motor,
+                Information,
+                Bluetooth,
+                FactoryReset,
+                About,
+                Exit,
+            ],
             Self::Display => &[
                 Units, Brightness, Theme, AutoOff, Trip, Hour, Minute, Language, Service, Back,
             ],
@@ -452,7 +460,7 @@ impl UiModel {
             }
             ServiceDistance | Odometer => {}
             Diagnostics => self.navigation.view = View::Diagnostics,
-            BatteryInfo | CtrlInfo | DisplayInfo | TorqueInfo | Errors | Sensitivity => {
+            BatteryInfo | CtrlInfo | DisplayInfo | TorqueInfo | Errors | Sensitivity | About => {
                 self.navigation.info_page = Some(item);
                 self.navigation.view = View::Information;
             }

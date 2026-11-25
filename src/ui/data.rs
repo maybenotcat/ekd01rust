@@ -47,4 +47,5 @@ pub enum Item {
     PowerMode,
     ServiceDistance,
     Odometer,
+    About,
 }

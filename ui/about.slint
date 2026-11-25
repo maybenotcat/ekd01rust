@@ -1,0 +1,17 @@
+import { PageFrame } from "components.slint";
+import { MenuText } from "menu-labels.slint";
+import { MenuItem } from "types.slint";
+
+export component AboutPage inherits PageFrame {
+    in property <bool> russian;
+    in property <string> build-id: "0123456789abcdef";
+    in property <string> git-commit: "7adae99";
+    in property <bool> git-modified: true;
+    title: MenuText.label(MenuItem.about, root.russian);
+
+    Text { x: 14px; y: 44px; width: 292px; height: 24px; text: "Build ID"; color: white; font-size: 14px; }
+    Text { x: 14px; y: 70px; width: 292px; height: 30px; text: root.build-id; color: white; font-size: 20px; }
+    Text { x: 14px; y: 118px; width: 292px; height: 24px; text: "Commit"; color: white; font-size: 14px; }
+    Text { x: 14px; y: 144px; width: 292px; height: 30px; text: root.git-commit; color: white; font-size: 20px; }
+    Text { x: 14px; y: 180px; width: 292px; height: 24px; visible: root.git-modified; text: root.russian ? "+ изменения" : "+ modified"; color: white; font-size: 14px; }
+}

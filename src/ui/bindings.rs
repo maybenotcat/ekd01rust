@@ -54,6 +54,7 @@ impl From<Item> for MenuItem {
             Item::PowerMode => Self::PowerMode,
             Item::ServiceDistance => Self::ServiceDistance,
             Item::Odometer => Self::Odometer,
+            Item::About => Self::About,
         }
     }
 }

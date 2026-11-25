@@ -3,6 +3,7 @@ import { StandardDashboard } from "standard.slint";
 import { SettingsPage } from "settings.slint";
 import { RidePage } from "ride.slint";
 import { InformationPage } from "information.slint";
+import { AboutPage } from "about.slint";
 import { UiText } from "text.slint";
 export { UiText } from "text.slint";
 export { MenuText } from "menu-labels.slint";
@@ -20,6 +21,9 @@ export component Dashboard inherits Window {
     in property <int> theme: 0;
     in property <bool> russian;
     in property <bool> imperial;
+    in property <string> build-id: "0123456789abcdef";
+    in property <string> git-commit: "7adae99";
+    in property <bool> git-modified;
     // Standalone preview data; the presenter supplies live numeric values.
     in property <DashboardData> dashboard-data: {
         speed-tenths: 253, speed-available: true, classic-speed-fill: 34,
@@ -86,7 +90,12 @@ export component Dashboard inherits Window {
         statistics: root.statistics; russian: root.russian; imperial: root.imperial;
         status: root.status; status-error: root.status-error;
     }
-    if root.view == Screen.information || root.view == Screen.diagnostics: InformationPage {
+    if root.view == Screen.information && root.information-item == MenuItem.about: AboutPage {
+        russian: root.russian; build-id: root.build-id;
+        git-commit: root.git-commit; git-modified: root.git-modified;
+        status: root.status; status-error: root.status-error;
+    }
+    if (root.view == Screen.information && root.information-item != MenuItem.about) || root.view == Screen.diagnostics: InformationPage {
         item: root.information-item; data: root.information-data;
         diagnostics: root.diagnostics-data; show-diagnostics: root.view == Screen.diagnostics;
         russian: root.russian; status: root.status; status-error: root.status-error;
