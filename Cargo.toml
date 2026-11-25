@@ -6,13 +6,14 @@ publish = false
 build = "build.rs"
 
 [workspace]
-members = ["xtask", "flasher", "ble-client", "boot-contract", "bootloader"]
+members = ["xtask", "flasher", "ble-client", "boot-contract", "bootloader", "mt2502-hal"]
 default-members = ["."]
 resolver = "3"
 
 [dependencies]
+mt2502-hal = { path = "mt2502-hal" }
 ekd01-boot-contract = { path = "boot-contract" }
-embassy-boot = { path = "third_party/embassy-boot" }
+embassy-boot = "=0.7.0"
 embedded-storage = "0.3.1"
 critical-section = { version = "1.2", features = ["restore-state-u32"] }
 portable-atomic = { version = "1.11", features = ["critical-section"] }

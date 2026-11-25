@@ -87,6 +87,7 @@ default-features = false
 
 [dependencies.heapless]
 version = "0.9"
+features = ["portable-atomic-critical-section"]
 
 [dependencies.log]
 version = "0.4.14"

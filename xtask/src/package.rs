@@ -51,6 +51,25 @@ fn json_file(path: &Path) -> Result<Value> {
     let data = data.strip_prefix(b"\xef\xbb\xbf").unwrap_or(&data);
     serde_json::from_slice(data).map_err(|error| format!("{}: {error}", path.display()))
 }
+
+// Packaging may use a custom or older ELF. Only attach a generated identity
+// when its value is actually present in the selected loader's payload.
+fn loader_identity(loader: &[u8], metadata: &Path) -> Option<String> {
+    let info = json_file(metadata).ok()?;
+    matching_loader_identity(loader, &info)
+}
+
+fn matching_loader_identity(loader: &[u8], info: &Value) -> Option<String> {
+    let id = info["build_id"].as_str()?;
+    if id.len() == 16
+        && id.bytes().all(|byte| byte.is_ascii_hexdigit())
+        && loader.windows(id.len()).any(|bytes| bytes == id.as_bytes())
+    {
+        Some(id.to_owned())
+    } else {
+        None
+    }
+}
 fn validate_file(directory: &Path, entry: &Value) -> Result<()> {
     let name = entry["path"]
         .as_str()
@@ -204,6 +223,9 @@ pub fn pack(
         serde_json::from_slice(&metadata(&main, identity)?).map_err(|e| e.to_string())?;
     info["bootloader"] =
         json!({"image": BOOT_IMAGE, "bytes": loader.len(), "sha256": sha256(&loader)});
+    if let Some(id) = loader_identity(&loader, &root.join("build/generated/boot-build-id.json")) {
+        info["bootloader"]["build_id"] = json!(id);
+    }
     info["boot_layout"] = json!({"active": [layout::ACTIVE.start, layout::ACTIVE.end],
         "dfu": [layout::DFU.start, layout::DFU.end], "state": [layout::STATE.start, layout::STATE.end]});
     let info = serde_json::to_vec_pretty(&info).map_err(|e| e.to_string())?;
@@ -238,6 +260,16 @@ pub fn pack(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn loader_identity_must_match_the_selected_binary() {
+        let id = "0123456789abcdef";
+        let info = json!({"build_id": id});
+        assert_eq!(matching_loader_identity(id.as_bytes(), &info).as_deref(), Some(id));
+        assert_eq!(matching_loader_identity(b"fedcba9876543210", &info), None);
+        assert_eq!(matching_loader_identity(b"", &info), None);
+        assert_eq!(matching_loader_identity(b"bad", &json!({"build_id": "bad"})), None);
+        assert_eq!(matching_loader_identity(id.as_bytes(), &json!({})), None);
+    }
     #[test]
     fn gd25lq64_profile_matches_original_ext_bl_data() {
         use crate::sfi_profile::*;

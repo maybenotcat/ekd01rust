@@ -5,6 +5,6 @@ edition = "2024"
 publish = false
 
 [dev-dependencies]
-embassy-boot = { path = "../third_party/embassy-boot" }
+embassy-boot = "=0.7.0"
 embedded-storage = "0.3.1"
 

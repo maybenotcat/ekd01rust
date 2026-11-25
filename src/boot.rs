@@ -6,7 +6,7 @@ use crate::soc::{
 };
 use ekd01_boot_contract as layout;
 use embedded_storage::nor_flash::{
-    ErrorType, NorFlash, NorFlashError, NorFlashErrorKind, ReadNorFlash,
+    ErrorType, NorFlash, ReadNorFlash,
 };
 
 struct StateFlash(Flash);
@@ -22,15 +22,6 @@ pub fn capture_handoff(magic: u32, inverse: u32, version: u32, trial: u32) {
     write32(layout::HANDOFF_ADDRESS + 4, inverse);
     write32(layout::HANDOFF_ADDRESS + 8, version);
     write32(layout::HANDOFF_ADDRESS + 12, trial);
-}
-impl NorFlashError for FlashError {
-    fn kind(&self) -> NorFlashErrorKind {
-        if matches!(self, Self::Range) {
-            NorFlashErrorKind::OutOfBounds
-        } else {
-            NorFlashErrorKind::Other
-        }
-    }
 }
 impl ErrorType for StateFlash {
     type Error = FlashError;

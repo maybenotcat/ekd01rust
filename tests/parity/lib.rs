@@ -1,8 +1,7 @@
 //! Native source-level checks. The NOR backend is substituted; no CPU is emulated.
 extern crate alloc;
 
-#[path = "../../src/soc/nor_geometry.rs"]
-pub mod nor_geometry;
+pub use mt2502_hal::flash::geometry as nor_geometry;
 
 #[test]
 fn nor_program_commands_preserve_header_and_page_boundaries() {

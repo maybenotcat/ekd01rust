@@ -11,6 +11,7 @@ mod storage;
 use ekd01_boot_contract as layout;
 use embassy_boot::{AlignedBuffer, BootLoader, BootLoaderConfig};
 use soc::DebugUart;
+include!(concat!(env!("OUT_DIR"), "/build_id.rs"));
 
 core::arch::global_asm!(
     ".equ BOOT_HANDOFF_MAGIC, {magic}",
@@ -51,6 +52,9 @@ extern "C" fn boot_main(parameters: u32) -> ! {
     soc::initialize_clocks(usb_boot);
     soc::initialize_uart();
     DebugUart::log("[BOOT] EKD01 EMBASSY; single loader; UART1 115200\n");
+    DebugUart::log("[BOOT] BUILD_ID=");
+    DebugUart::log(BUILD_ID);
+    DebugUart::log("\n");
     emi::initialize();
     rtc::initialize_oscillator();
     soc::stabilize_32k();

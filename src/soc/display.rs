@@ -48,7 +48,6 @@ impl Display {
         display.clock.mode(1);
         write32(DRVPDN_CON0_CLR, EKD_PDN_LCD_CLOCKS);
         pmu.enable_lcd_supply();
-        Timer::verify_progress();
         Timer::delay_ms(20).await;
         DebugUart::log("[LCD] SUPPLY_SETTLED; BUS_INIT_ENTER\n");
         update32(

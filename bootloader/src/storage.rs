@@ -4,17 +4,9 @@ use crate::soc::{
 };
 use ekd01_boot_contract::{ERASE_BYTES, Partition, WRITE_BYTES};
 use embedded_storage::nor_flash::{
-    ErrorType, NorFlash, NorFlashError, NorFlashErrorKind, ReadNorFlash,
+    ErrorType, NorFlash, ReadNorFlash,
 };
 
-impl NorFlashError for FlashError {
-    fn kind(&self) -> NorFlashErrorKind {
-        match self {
-            Self::Range => NorFlashErrorKind::OutOfBounds,
-            _ => NorFlashErrorKind::Other,
-        }
-    }
-}
 
 pub struct PartitionFlash {
     region: Partition,

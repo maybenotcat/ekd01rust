@@ -44,7 +44,6 @@ pub extern "C" fn firmware_main(magic: u32, inverse: u32, version: u32, trial: u
     soc::memory::Memory::initialize_cache();
     soc::time::Timer::initialize_interrupts();
     soc::time::Timer::enable_irq();
-    soc::time::Timer::verify_progress();
     static EXECUTOR: static_cell::StaticCell<embassy_executor::raw::Executor> =
         static_cell::StaticCell::new();
     let executor = EXECUTOR.init(embassy_executor::raw::Executor::new(core::ptr::null_mut()));

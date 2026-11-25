@@ -1,0 +1,9 @@
+[package]
+name = "mt2502-hal"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+critical-section = "1.2"
+embedded-storage = "0.3.1"

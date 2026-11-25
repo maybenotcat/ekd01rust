@@ -1,5 +1,5 @@
 // Original N22 calibration and startup register data.
-use super::registers::*;
+use crate::registers::*;
 pub const CALIBRATION: [[u32; 27]; 6] = [
     [
         0, 0, 0, 0, 0, 0, 10, 12, 13, 14, 14, 15, 15, 0, 0, 0, 1, 1, 2, 2, 3, 4, 5, 7, 8, 8, 0,

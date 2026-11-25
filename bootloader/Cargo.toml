@@ -6,9 +6,9 @@ publish = false
 build = "build.rs"
 
 [dependencies]
+mt2502-hal = { path = "../mt2502-hal" }
 ekd01-boot-contract = { path = "../boot-contract" }
-embassy-boot = { path = "../third_party/embassy-boot" }
+embassy-boot = "=0.7.0"
 embedded-storage = "0.3.1"
 critical-section = { version = "1.2", features = ["restore-state-u32"] }
-heapless = { version = "0.9", features = ["portable-atomic-critical-section"] }
 

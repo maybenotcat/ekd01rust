@@ -21,8 +21,23 @@ dependencies = [
  "bitflags",
  "critical-section",
  "littlefs2-rust",
+ "mt2502-hal",
 ]
+
+[[package]]
+name = "embedded-storage"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c815b3ed4213d85d6cfd274b871f430c0681084e28dfd4a537877f47f844ec83"
 
 [[package]]
 name = "littlefs2-rust"
 version = "0.1.1"
+
+[[package]]
+name = "mt2502-hal"
+version = "0.1.0"
+dependencies = [
+ "critical-section",
+ "embedded-storage",
+]

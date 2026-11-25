@@ -2,16 +2,10 @@
 #![allow(dead_code, non_upper_case_globals, non_snake_case)]
 
 mod critical;
-#[path = "../../src/soc/flash.rs"]
-pub mod flash;
-#[path = "../../src/soc/mmio.rs"]
-pub mod mmio;
-#[path = "../../src/soc/nor_geometry.rs"]
-mod nor_geometry;
-#[path = "../../src/soc/pmu_data.rs"]
-mod pmu_data;
-#[path = "../../src/soc/registers.rs"]
-pub mod registers;
+pub use mt2502_hal::flash;
+pub use mt2502_hal::mmio;
+use mt2502_hal::pmu::data as pmu_data;
+pub use mt2502_hal::registers;
 
 use mmio::*;
 use registers::*;
@@ -320,3 +314,7 @@ pub fn arm_application_watchdog() {
     write16(WDT_MODE, WDT_MODE_KEY | WDT_MODE_ENABLE);
     feed_watchdog();
 }
+
+// Static diagnostic bridge used only during shared-crate extraction.
+#[unsafe(no_mangle)]
+fn mt2502_diagnostic_hex(name: &str, value: u32) { DebugUart::hex(name, value); }

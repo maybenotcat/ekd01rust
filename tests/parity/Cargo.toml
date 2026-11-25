@@ -7,6 +7,7 @@ publish = false
 [workspace]
 
 [dependencies]
+mt2502-hal = { path = "../../mt2502-hal" }
 bitflags = "2"
 critical-section = { version = "1.2", features = ["std"] }
 littlefs_rust = { package = "littlefs2-rust", path = "../../third_party/littlefs_rust", default-features = false }
