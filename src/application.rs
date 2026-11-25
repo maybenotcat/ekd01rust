@@ -38,6 +38,7 @@ enum MotorRead {
 }
 
 pub struct Application {
+    flash: FlashBus,
     pmu: Pmu,
     rtc: Rtc,
     backlight: Backlight,
@@ -60,7 +61,8 @@ pub struct Application {
 }
 impl Application {
     pub async fn initialize(spawner: Spawner) -> Self {
-        let flash = Flash::initialize();
+        // Single NOR owner after entry installed RAM routines; shared by all users.
+        let flash = unsafe { Flash::initialize() };
         let jedec = flash.jedec;
         let available = flash.available();
         let bus: FlashBus = Rc::new(RefCell::new(flash));
@@ -85,9 +87,10 @@ impl Application {
             model.preferences.settings.power_mode,
         );
         BluetoothControl::set_enabled(model.preferences.settings.bluetooth);
-        spawner.spawn(bluetooth_task(bus).unwrap());
+        spawner.spawn(bluetooth_task(bus.clone()).unwrap());
         DebugUart::log("[UI] APPLICATION_READY\n");
         Self {
+            flash: bus,
             pmu,
             rtc: Rtc,
             backlight,
@@ -362,7 +365,9 @@ impl Application {
                 TelemetryService::publish(self.motor.status(), now, self.sequence);
             }
             if self.power.state != PowerState::Off {
-                self.ui.render().await.expect("LCD DMA");
+                if self.ui.render().await.expect("LCD DMA") {
+                    crate::boot::confirm_first_frame(&self.flash);
+                }
             }
             // Publish the requested screen before a synchronous settings operation.
             let checkpoint_due = self

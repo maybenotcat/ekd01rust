@@ -23,13 +23,13 @@ fn fatal_ram(code: u32) -> ! {
 
 #[unsafe(link_section = ".ramfunc")]
 #[inline(never)]
-pub unsafe fn transfer_ram(
-    mode: u32,
-    tx: *const u8,
-    out_len: usize,
-    rx: *mut u8,
-    in_len: usize,
-) {
+/// Execute one manual SFI transaction from SRAM.
+///
+/// # Safety
+/// The caller owns SFI exclusively, has installed this code in SRAM and has
+/// selected a valid mode. Buffers must remain valid and accessible without
+/// mapped NOR for the entire transaction. The caller owns mode restoration.
+pub unsafe fn transfer_ram(mode: u32, tx: *const u8, out_len: usize, rx: *mut u8, in_len: usize) {
     if out_len > SFI_GPRAM_BYTES || in_len > SFI_GPRAM_BYTES - out_len {
         fatal_ram(8);
     }

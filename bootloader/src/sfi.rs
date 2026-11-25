@@ -2,12 +2,7 @@
 //! N22 COMBO_MEM_SFI entry 2 is selected by JEDEC C8 60 17.
 use crate::{
     sfi_profile::{DEVICE_COMMANDS, HW_CONF_130M, JEDEC},
-    soc::{
-        DebugUart,
-        flash::{Flash, transfer_ram},
-        mmio::*,
-        registers::*,
-    },
+    soc::{DebugUart, flash::transfer_ram, mmio::*, registers::*},
     stop,
 };
 
@@ -15,7 +10,10 @@ pub fn initialize() {
     DebugUart::log("[BOOT] SFI_INIT_ENTER\n");
     // custom_setSFIExt repeats pad/DCM setup after EMI calibration.
     crate::soc::initialize_bus_pads();
-    if Flash::initialize().jedec != u32::from_be_bytes([0, JEDEC[0], JEDEC[1], JEDEC[2]]) {
+    // Raw startup probe before attaching the exclusive runtime controller.
+    let jedec = unsafe { crate::soc::flash::probe_jedec() };
+    DebugUart::hex("[FLASH] JEDEC", jedec);
+    if jedec != u32::from_be_bytes([0, JEDEC[0], JEDEC[1], JEDEC[2]]) {
         stop("[BOOT] SFI_UNSUPPORTED_DEVICE\n");
     }
     let saved_mac = read32(RW_SFI_MAC_CTL);

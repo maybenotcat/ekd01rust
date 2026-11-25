@@ -4,7 +4,7 @@ pub mod btif;
 pub mod buttons;
 pub mod critical;
 pub mod display;
-pub use mt2502_hal::flash;
+pub mod flash;
 pub mod gpio;
 pub mod memory;
 pub use mt2502_hal::mmio;
@@ -67,7 +67,3 @@ impl fmt::Write for DebugUart {
         Ok(())
     }
 }
-
-// Static diagnostic bridge used only during shared-crate extraction.
-#[unsafe(no_mangle)]
-fn mt2502_diagnostic_hex(name: &str, value: u32) { DebugUart::hex(name, value); }

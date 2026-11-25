@@ -71,9 +71,12 @@ extern "C" fn boot_main(parameters: u32) -> ! {
     soc::initialize_power();
     soc::release_usb_download_power();
     soc::latch_power();
-    let active = storage::PartitionFlash::new(layout::ACTIVE);
-    let dfu = storage::PartitionFlash::new(layout::DFU);
-    let state = storage::PartitionFlash::new(layout::STATE);
+    // Exclusive physical owner; all three Embassy Boot views borrow this device.
+    let controller = unsafe { soc::flash::FlashController::attach() };
+    DebugUart::hex("[FLASH] JEDEC", controller.jedec().unwrap_or(0));
+    let active = storage::partition(&controller, layout::ACTIVE);
+    let dfu = storage::partition(&controller, layout::DFU);
+    let state = storage::partition(&controller, layout::STATE);
     let mut loader = BootLoader::new(BootLoaderConfig { active, dfu, state });
     let mut buffer = AlignedBuffer([0u8; 256]);
     let result = loader

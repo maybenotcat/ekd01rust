@@ -66,7 +66,7 @@ sources must be fetched once before offline builds can use the Cargo cache.
 
 ## Updates and recovery
 
-The three bounded flash adapters implement `embedded-storage` traits for the
+The three bounded views share one physical NOR controller. The HAL implements `embedded-storage` traits for the
 blocking Embassy Boot algorithm. Update progress is journaled in STATE.
 The loader passes magic/inverse/version/trial in R4..R7; the application captures
 it at physical PSRAM 0003f000. Only a valid trial handoff can confirm an update.

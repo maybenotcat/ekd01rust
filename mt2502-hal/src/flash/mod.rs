@@ -1,33 +1,20 @@
 //! GD25LQ64C driver. Manual SFI transactions must execute entirely from SRAM.
 use self::geometry::{PROGRAM_DATA_MAX, program_chunk};
-use crate::{DebugUart, mmio::*, registers::*};
+use crate::{mmio::*, registers::*};
 
-pub const CLAIM: u32 = 0x500000;
-pub const STORAGE: u32 = 0x501000;
-pub const STORAGE_END: u32 = 0x560000;
 pub const SECTOR_BYTES: usize = 4096;
-const NOR_BASE: u32 = 0x10000000;
-const NOR_BYTES: u32 = 0x800000;
+pub const NOR_BASE: u32 = 0x10000000;
+pub const NOR_BYTES: u32 = 0x800000;
 
-#[derive(Default)]
+#[derive(Debug, Default, Clone, Copy)]
 #[repr(C)]
-struct ProgramTrace {
-    header: u32,
-    first_data: u32,
-    output_bytes: u32,
-    mode: u32,
-    status_after: u32,
+pub struct ProgramTrace {
+    pub header: u32,
+    pub first_data: u32,
+    pub output_bytes: u32,
+    pub mode: u32,
+    pub status_after: u32,
 }
-impl ProgramTrace {
-    fn report(&self) {
-        DebugUart::hex("[FLASH] PROGRAM_GPRAM_HEADER", self.header);
-        DebugUart::hex("[FLASH] PROGRAM_GPRAM_DATA", self.first_data);
-        DebugUart::hex("[FLASH] PROGRAM_OUTL", self.output_bytes);
-        DebugUart::hex("[FLASH] PROGRAM_MODE", self.mode);
-        DebugUart::hex("[FLASH] PROGRAM_SR1_AFTER", self.status_after);
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FlashError {
     Range,
@@ -36,45 +23,23 @@ pub enum FlashError {
     Protected,
     Verify,
     Suspended,
+    Busy,
 }
-pub struct Flash {
-    writable: bool,
-    write_start: u32,
-    write_end: u32,
-    pub jedec: u32,
+/// Diagnostic data captured only after mapped NOR access is restored.
+#[derive(Debug, Clone, Copy)]
+pub struct FlashFault {
+    pub address: u32,
+    pub expected: u8,
+    pub actual: u8,
+    pub trace: Option<ProgramTrace>,
 }
-impl Flash {
-    pub fn initialize() -> Self {
-        let jedec = critical_section::with(|_| unsafe {
-            operation_ram(0, 0, core::ptr::null(), 0, core::ptr::null_mut())
-        }) as u32;
-        let magic = read32(NOR_BASE + 0x50000) & 0xffffff;
-        DebugUart::hex("[FLASH] JEDEC", jedec);
-        let writable = jedec == NOR_JEDEC_GD25LQ64 && magic == 0x4d4d4d;
-        Self {
-            writable,
-            write_start: CLAIM,
-            write_end: NOR_BYTES,
-            jedec,
-        }
-    }
-    /// Boot/update code must explicitly select its owned partition. Ordinary
-    /// settings operations retain the original protected write window.
-    pub fn partition(start: u32, end: u32) -> Result<Self, FlashError> {
-        if start < 0x050000 || start >= end || end > CLAIM || start & 4095 != 0 || end & 4095 != 0 {
-            return Err(FlashError::Range);
-        }
-        let mut flash = Self::initialize();
-        // During an interrupted swap the active GFH may be erased. Boot
-        // recovery must depend on the detected NOR, not on a valid active image.
-        flash.writable = flash.jedec == NOR_JEDEC_GD25LQ64;
-        flash.write_start = start;
-        flash.write_end = end;
-        Ok(flash)
-    }
-    pub fn available(&self) -> bool {
-        self.writable
-    }
+
+/// Physical device, kept private behind the single controller.
+struct FlashDevice {
+    jedec: u32,
+    fault: Option<FlashFault>,
+}
+impl FlashDevice {
     pub fn read(&self, offset: u32, output: &mut [u8]) -> Result<(), FlashError> {
         if offset > NOR_BYTES || output.len() > (NOR_BYTES - offset) as usize {
             return Err(FlashError::Range);
@@ -85,29 +50,28 @@ impl Flash {
         Ok(())
     }
     fn check_write(&self, offset: u32, size: usize) -> Result<(), FlashError> {
-        if offset < self.write_start
-            || offset > self.write_end
-            || size > (self.write_end - offset) as usize
-        {
+        if offset > NOR_BYTES || size > (NOR_BYTES - offset) as usize {
             return Err(FlashError::Range);
         }
-        if !self.writable {
+        if self.jedec != NOR_JEDEC_GD25LQ64 {
             return Err(FlashError::UnknownDevice);
         }
         Ok(())
     }
     pub fn program(&mut self, offset: u32, bytes: &[u8]) -> Result<(), FlashError> {
+        self.fault = None;
         self.check_write(offset, bytes.len())?;
         if let Some((index, &wanted)) = bytes
             .iter()
             .enumerate()
             .find(|(i, b)| read8(NOR_BASE + offset + *i as u32) & **b != **b)
         {
-            DebugUart::hex("[FLASH] NEEDS_ERASE_ADDRESS", offset + index as u32);
-            DebugUart::hex(
-                "[FLASH] EXISTING_REQUESTED",
-                ((read8(NOR_BASE + offset + index as u32) as u32) << 8) | wanted as u32,
-            );
+            self.fault = Some(FlashFault {
+                address: offset + index as u32,
+                expected: wanted,
+                actual: read8(NOR_BASE + offset + index as u32),
+                trace: None,
+            });
             return Err(FlashError::NeedsErase);
         }
         let mut written = 0;
@@ -123,12 +87,12 @@ impl Flash {
             Self::result(result)?;
             for i in 0..count {
                 if read8(NOR_BASE + address + i as u32) != page[i] {
-                    DebugUart::hex("[FLASH] VERIFY_ADDRESS", address + i as u32);
-                    DebugUart::hex(
-                        "[FLASH] EXPECTED_ACTUAL",
-                        ((page[i] as u32) << 8) | read8(NOR_BASE + address + i as u32) as u32,
-                    );
-                    trace.report();
+                    self.fault = Some(FlashFault {
+                        address: address + i as u32,
+                        expected: page[i],
+                        actual: read8(NOR_BASE + address + i as u32),
+                        trace: Some(trace),
+                    });
                     return Err(FlashError::Verify);
                 }
             }
@@ -137,6 +101,7 @@ impl Flash {
         Ok(())
     }
     pub fn erase(&mut self, offset: u32) -> Result<(), FlashError> {
+        self.fault = None;
         self.check_write(offset, SECTOR_BYTES)?;
         if offset & 4095 != 0 {
             return Err(FlashError::Range);
@@ -147,11 +112,12 @@ impl Flash {
         Self::result(result)?;
         if let Some(index) = (0..SECTOR_BYTES).find(|i| read8(NOR_BASE + offset + *i as u32) != 255)
         {
-            DebugUart::hex("[FLASH] ERASE_VERIFY_ADDRESS", offset + index as u32);
-            DebugUart::hex(
-                "[FLASH] ERASE_VERIFY_ACTUAL",
-                read8(NOR_BASE + offset + index as u32) as u32,
-            );
+            self.fault = Some(FlashFault {
+                address: offset + index as u32,
+                expected: 255,
+                actual: read8(NOR_BASE + offset + index as u32),
+                trace: None,
+            });
             return Err(FlashError::Verify);
         }
         Ok(())
@@ -167,11 +133,21 @@ impl Flash {
     }
 }
 
-
 pub mod geometry;
 mod ram;
 use ram::operation_ram;
 pub use ram::transfer_ram;
+
+/// Read JEDEC during platform startup, before attaching the runtime owner.
+///
+/// # Safety
+/// The caller must exclusively own SFI and have installed the SRAM routines.
+/// No region/controller operation may overlap this low-level transaction.
+pub unsafe fn probe_jedec() -> u32 {
+    critical_section::with(|_| unsafe {
+        operation_ram(0, 0, core::ptr::null(), 0, core::ptr::null_mut())
+    }) as u32
+}
 
 impl embedded_storage::nor_flash::NorFlashError for FlashError {
     fn kind(&self) -> embedded_storage::nor_flash::NorFlashErrorKind {
@@ -181,3 +157,6 @@ impl embedded_storage::nor_flash::NorFlashError for FlashError {
         }
     }
 }
+
+mod region;
+pub use region::{FlashController, FlashRegion, RegionBounds};

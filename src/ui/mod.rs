@@ -89,7 +89,7 @@ impl UserInterface {
             first_frame: true,
         })
     }
-    pub async fn render(&mut self) -> Result<(), DisplayError> {
+    pub async fn render(&mut self) -> Result<bool, DisplayError> {
         if self.first_frame {
             crate::soc::DebugUart::log("[SLINT] FIRST_TIMERS_ENTER\n");
         }
@@ -129,11 +129,12 @@ impl UserInterface {
             self.display.present(words, region).await?;
             if self.first_frame {
                 crate::soc::DebugUart::log("[LCD] FIRST_PRESENT_EXIT\n");
-                crate::boot::confirm_first_frame();
             }
+            let first = self.first_frame;
             self.first_frame = false;
+            return Ok(first);
         }
-        Ok(())
+        Ok(false)
     }
     pub fn now() -> u32 {
         Timer::now()

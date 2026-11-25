@@ -314,7 +314,3 @@ pub fn arm_application_watchdog() {
     write16(WDT_MODE, WDT_MODE_KEY | WDT_MODE_ENABLE);
     feed_watchdog();
 }
-
-// Static diagnostic bridge used only during shared-crate extraction.
-#[unsafe(no_mangle)]
-fn mt2502_diagnostic_hex(name: &str, value: u32) { DebugUart::hex(name, value); }

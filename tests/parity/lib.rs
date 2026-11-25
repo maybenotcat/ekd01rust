@@ -273,7 +273,7 @@ mod checks {
             [0xc4, 9, 0xa0, 1, 0x1a, 8, 0, 0]
         );
         assert!(CanFrame::controls(5, 6, false, true, 0).is_none());
-        assert!(CanFrame::basic_settings(5001, 260, 2074).is_none());
+        assert!(CanFrame::basic_settings(protocol::basic_bounds::LIMIT_MAX_X100 + 1, 260, 2074).is_none());
     }
     #[test]
     fn bridge_delimiters_resynchronization_and_gap() {
