@@ -345,6 +345,10 @@ msgstr ""
 msgid "SETTINGS"
 msgstr ""
 
+#: ui/menu-labels.slint
+msgid "Screen rotation"
+msgstr ""
+
 #: ui/menu-labels.slint:165
 msgid "SPEED PER LEVEL"
 msgstr ""

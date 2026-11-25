@@ -48,4 +48,5 @@ pub enum Item {
     ServiceDistance,
     Odometer,
     About,
+    FlipScreen,
 }

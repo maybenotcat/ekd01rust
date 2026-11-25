@@ -3,6 +3,7 @@ import { MenuItem, MenuPage } from "types.slint";
 export global MenuText {
     // Group labels by settings domain instead of one deeply nested chain.
     public pure function label(item: MenuItem) -> string {
+        if (item == MenuItem.flip-screen) { return @tr("Screen rotation"); }
         if (item == MenuItem.about) { return @tr("About"); }
         if (
             item == MenuItem.display ||

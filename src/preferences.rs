@@ -1,7 +1,8 @@
 use crate::{crc::crc32, soc::DebugUart, storage::SettingsStore};
 use littlefs_rust::Error;
 
-const RECORD_VERSION: u32 = 6;
+const RECORD_VERSION: u32 = 7;
+const DISPLAY_FLIP_MASK: u32 = 1 << 13;
 const LANGUAGE_SHIFT: u32 = 16;
 const LANGUAGE_MASK: u32 = 0xff << LANGUAGE_SHIFT;
 
@@ -29,6 +30,7 @@ pub struct Settings {
     pub auto_off_minutes: u8,
     pub bluetooth: bool,
     pub language: u8,
+    pub flip_screen: bool,
     pub power_mode: u8,
     pub service_interval_km: u32,
 }
@@ -42,6 +44,7 @@ impl Default for Settings {
             auto_off_minutes: 0,
             bluetooth: true,
             language: 0,
+            flip_screen: true,
             power_mode: 0,
             service_interval_km: 0,
         }
@@ -94,6 +97,7 @@ impl Record {
         }
         let flags = record.word(24);
         let mask = (if version >= 6 { LANGUAGE_MASK } else { 0 })
+            | (if version >= 7 { DISPLAY_FLIP_MASK } else { 0 })
             | (if version >= 4 { 1 << 12 } else { 0 })
             | 255
             | if version >= 2 { 1 << 8 } else { 0 }
@@ -157,6 +161,9 @@ impl Record {
                 *error = self.word(44 + index * 4);
             }
         }
+        if version >= 7 {
+            out.settings.flip_screen = flags & DISPLAY_FLIP_MASK != 0;
+        }
         out
     }
     fn encode(preferences: &Preferences, sequence: u32) -> Self {
@@ -167,6 +174,7 @@ impl Record {
             // Keep the legacy Russian bit separate from the full locale ID.
             | (((settings.language == 1) as u32) << 9)
             | ((settings.language as u32) << LANGUAGE_SHIFT)
+            | if settings.flip_screen { DISPLAY_FLIP_MASK } else { 0 }
             | ((settings.power_mode as u32) << 10)
             | ((settings.theme as u32) << 12);
         for (offset, value) in [

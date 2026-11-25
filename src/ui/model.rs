@@ -74,7 +74,8 @@ impl Page {
                 Exit,
             ],
             Self::Display => &[
-                Units, Brightness, Theme, AutoOff, Trip, Hour, Minute, Language, Service, Back,
+                Units, Brightness, Theme, FlipScreen, AutoOff, Trip, Hour, Minute, Language,
+                Service, Back,
             ],
             Self::Motor => &[Levels, Limit, Wheel, Circumference, Advanced, Back],
             Self::Information => &[BatteryInfo, Errors, ErrorClear, Diagnostics, Back],
@@ -138,10 +139,12 @@ pub struct UiModel {
     pub save_error: bool,
     pub motor_busy: bool,
     pub motor_online: bool,
+    input_flipped: bool,
 }
 impl UiModel {
     pub fn new(preferences: Preferences) -> Self {
         Self {
+            input_flipped: preferences.settings.flip_screen,
             preferences,
             navigation: Navigation::default(),
             basic: BasicDraft::default(),
@@ -258,6 +261,7 @@ impl UiModel {
                     crate::localization::Language::next(settings.language, direction)
             }
             Theme => settings.theme.toggle(),
+            FlipScreen => settings.flip_screen = !settings.flip_screen,
             PowerMode => {
                 settings.power_mode =
                     (settings.power_mode as i32 + 4 + direction).rem_euclid(4) as u8;
@@ -377,6 +381,7 @@ impl UiModel {
                 | Bluetooth
                 | Language
                 | Theme
+                | FlipScreen
                 | PowerMode
                 | ServiceInterval
                 | AutoOff
@@ -484,6 +489,18 @@ impl UiModel {
         }
         actions
     }
+    /// Entry point for the physical button queue, after MCU/GPIO filtering.
+    pub fn step_physical(&mut self, keys: ButtonEvents, now: u32) -> Actions {
+        let flipped = self.preferences.settings.flip_screen;
+        if self.input_flipped != flipped {
+            // Rotation can change while the editing key is still held. Keep
+            // release/short suppression attached to the same physical key.
+            self.navigation.repeated = ButtonEvents::orient_mask(self.navigation.repeated, true);
+            self.input_flipped = flipped;
+        }
+        self.step(keys.oriented(flipped), now)
+    }
+    /// Process logical buttons; physical input must enter through step_physical.
     pub fn step(&mut self, mut keys: ButtonEvents, now: u32) -> Actions {
         keys.short &= !self.navigation.repeated;
         self.navigation.repeated &= !keys.released;

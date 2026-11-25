@@ -24,6 +24,7 @@ export component SettingsPage inherits PageFrame {
         { kind: MenuItem.units, value: { kind: ValueKind.distance-unit } },
         { kind: MenuItem.brightness, value: { kind: ValueKind.percent, whole: 50, available: true } },
         { kind: MenuItem.theme, value: { kind: ValueKind.theme, flag: true } },
+        { kind: MenuItem.flip-screen, value: { kind: ValueKind.rotation, flag: true } },
         { kind: MenuItem.auto-off, value: { kind: ValueKind.minutes, whole: 5, available: true } },
         { kind: MenuItem.trip, value: { kind: ValueKind.distance-hundredths, whole: 12, fraction: 34, available: true } },
         { kind: MenuItem.hour, value: { kind: ValueKind.clock, whole: 12, fraction: 34, available: true } },

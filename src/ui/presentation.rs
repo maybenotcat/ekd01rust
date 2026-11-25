@@ -191,6 +191,7 @@ impl Presenter<'_> {
                 ValueKind::Theme,
                 s.theme == crate::preferences::DashboardTheme::Classic,
             ),
+            FlipScreen => DisplayValue::option(ValueKind::Rotation, s.flip_screen),
             Brightness => DisplayValue::number(
                 ValueKind::Percent,
                 [10, 30, 50, 75, 100][s.brightness.saturating_sub(1).min(4) as usize],
@@ -465,6 +466,7 @@ impl UserInterface {
         let c = &self.component;
         c.set_view(model.navigation.view.into());
         self.set_language(model.preferences.settings.language);
+        self.flip_screen.set(model.preferences.settings.flip_screen);
         c.set_imperial(model.preferences.settings.imperial);
         c.set_theme(model.preferences.settings.theme as i32);
         c.set_status_error(model.save_error);

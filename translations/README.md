@@ -19,10 +19,11 @@ installation, locale service or filesystem access is needed on the device.
 
 English (ID 0) and Russian (ID 1) are permanent for compatibility. Unknown IDs
 display English but remain intact in the settings record until the user chooses
-a supported language. Settings records v1..v5 still load; the next actual save
-migrates them to v6. Record size and filesystem layout are unchanged. V6 stores
+a supported language. Settings records v1..v6 still load; the next actual save
+migrates them to v7. Record size and filesystem layout are unchanged. V6 introduced
 the full locale ID in flags bits 16..23, keeping the old Russian bit separate
-from motor mode and theme. Older firmware cannot read a v6 record.
+from motor mode and theme. V7 adds display rotation in bit 13; older records
+default to the new 180-degree orientation. Older firmware cannot read a v7 record.
 
 ## Change UI messages
 

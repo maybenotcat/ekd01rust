@@ -30,6 +30,8 @@ pub struct Display<P: Runtime> {
     _bus: [Pin; 3],
     failed: bool,
     first_transfer: bool,
+    landscape_mode: u8,
+    flipped: bool,
 }
 impl<P: Runtime> Display<P> {
     pub async fn initialize(pmu: &mut Power<P>) -> Result<Self, DisplayError> {
@@ -50,6 +52,8 @@ impl<P: Runtime> Display<P> {
                 _bus: pins.bus.map(|number| Pin::claim(number)),
                 failed: false,
                 first_transfer: true,
+                landscape_mode: 0,
+                flipped: false,
             }
         };
         for pin in [&mut display.reset, &mut display.cs] {
@@ -142,10 +146,40 @@ impl<P: Runtime> Display<P> {
         };
         display.command(DCS_SET_ADDRESS_MODE as u8);
         display.datum(orientation);
+        display.landscape_mode = orientation;
         display.window(0, 0, 319, 239);
         P::hex("[LCD] LANDSCAPE_MADCTL", orientation as u32);
         P::log("[LCD] PANEL_INIT_EXIT\n");
         Ok(display)
+    }
+    /// Rotate the panel scan by 180 degrees without changing RGB order or DMA geometry.
+    /// The caller must resend the complete framebuffer when this returns true.
+    pub async fn set_flipped(&mut self, flipped: bool) -> Result<bool, DisplayError> {
+        if self.failed {
+            return Err(DisplayError::Disabled);
+        }
+        if self.flipped == flipped {
+            return Ok(false);
+        }
+        let started = P::now();
+        while Lcd::status() & (LCD_STATUS_RUN_BIT | LCD_STATUS_BUSY_BIT) != 0 {
+            if P::now().wrapping_sub(started) >= EKD_LCD_DMA_TIMEOUT_TICKS {
+                return self.fail(DisplayError::DmaIdle);
+            }
+            P::delay_ticks(1).await;
+        }
+        let mode = self.landscape_mode
+            ^ if flipped {
+                (DCS_MADCTL_MX | DCS_MADCTL_MY) as u8
+            } else {
+                0
+            };
+        self.command(DCS_SET_ADDRESS_MODE as u8);
+        self.datum(mode);
+        self.window(0, 0, (WIDTH - 1) as u16, (HEIGHT - 1) as u16);
+        self.flipped = flipped;
+        P::hex("[LCD] ROTATION_MADCTL", mode as u32);
+        Ok(true)
     }
     fn settle() {
         Lcd::settle();
@@ -208,7 +242,7 @@ impl<P: Runtime> Display<P> {
         Lcd::stop_dma();
         self.cs.set(true);
     }
-    fn fail(&mut self, error: DisplayError) -> Result<(), DisplayError> {
+    fn fail<T>(&mut self, error: DisplayError) -> Result<T, DisplayError> {
         self.stop_dma();
         self.failed = true;
         P::hex("[LCD] DMA_STATUS", Lcd::status());

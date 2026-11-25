@@ -8,6 +8,27 @@ pub struct ButtonEvents {
     pub held: u8,
     pub queued_tick: u32,
 }
+impl ButtonEvents {
+    /// Map physical +/- positions to logical actions; POWER and other bits stay intact.
+    pub const fn orient_mask(mask: u8, flipped: bool) -> u8 {
+        if flipped {
+            (mask & !3) | ((mask & 1) << 1) | ((mask & 2) >> 1)
+        } else {
+            mask
+        }
+    }
+    pub fn oriented(self, flipped: bool) -> Self {
+        Self {
+            pressed: Self::orient_mask(self.pressed, flipped),
+            released: Self::orient_mask(self.released, flipped),
+            short: Self::orient_mask(self.short, flipped),
+            long: Self::orient_mask(self.long, flipped),
+            repeat: Self::orient_mask(self.repeat, flipped),
+            held: Self::orient_mask(self.held, flipped),
+            queued_tick: self.queued_tick,
+        }
+    }
+}
 #[derive(Clone, Copy, Default)]
 struct Key {
     changed: u32,

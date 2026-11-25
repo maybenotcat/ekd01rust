@@ -263,6 +263,9 @@ msgstr "MANTENIMIENTO"
 msgid "SETTINGS"
 msgstr "AJUSTES"
 
+msgid "Screen rotation"
+msgstr "Rotación de pantalla"
+
 msgid "SPEED PER LEVEL"
 msgstr "VELOCIDAD POR NIVEL"
 

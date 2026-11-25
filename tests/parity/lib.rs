@@ -3,11 +3,59 @@ extern crate alloc;
 #[cfg(test)]
 mod catalogs;
 #[cfg(test)]
+mod rotated_input;
+#[cfg(test)]
 #[allow(dead_code)]
 #[path = "../../build-support/localization.rs"]
 mod locale_registry;
 #[path = "../../src/localization.rs"]
 pub mod localization;
+
+#[test]
+fn screen_rotation_menu_saves_both_orientations_and_reset_restores_default() {
+    use input::ButtonEvents;
+    use preferences::{Preferences, SettingsManager};
+    use std::{cell::RefCell, rc::Rc};
+    use storage::SettingsStore;
+    use ui::{
+        data::Item,
+        model::{Actions, Page, UiModel, View},
+    };
+    let bus = Rc::new(RefCell::new(soc::flash::Flash::default()));
+    let mut model = UiModel::new(Preferences::default());
+    assert!(model.preferences.settings.flip_screen);
+    model.navigation.view = View::Menu;
+    model.enter(Page::Display);
+    model.navigation.selected = (0..model.count())
+        .find(|i| model.item(*i) == Item::FlipScreen)
+        .unwrap();
+    let power = ButtonEvents {
+        short: 4,
+        released: 4,
+        ..Default::default()
+    };
+    let mut store = SettingsManager::new(SettingsStore::new(bus.clone()));
+    for expected in [false, true] {
+        model.step(power, 1);
+        model.step(
+            ButtonEvents {
+                pressed: 1,
+                ..Default::default()
+            },
+            2,
+        );
+        assert_eq!(model.preferences.settings.flip_screen, expected);
+        assert!(model.step(power, 3).contains(Actions::SAVE));
+        store.save(&model.preferences).unwrap();
+        assert_eq!(
+            SettingsManager::new(SettingsStore::new(bus.clone())).load(),
+            model.preferences
+        );
+    }
+    model.preferences.settings.flip_screen = false;
+    model.preferences.factory_reset();
+    assert!(model.preferences.settings.flip_screen);
+}
 
 #[cfg(test)]
 #[allow(dead_code)]

@@ -79,6 +79,7 @@ export global UiText {
         return "\{data.whole} / 8";
     }
     pure function option-value(data: DisplayValue, imperial: bool) -> string {
+        if (data.kind == ValueKind.rotation) { return data.flag ? "180°" : "0°"; }
         if (data.kind == ValueKind.toggle) { return data.flag ? @tr("On") : @tr("Off"); }
         if (data.kind == ValueKind.confirmation) { return data.flag ? @tr("Yes") : @tr("No"); }
         if (data.kind == ValueKind.theme) { return data.flag ? @tr("Classic") : @tr("Standard"); }

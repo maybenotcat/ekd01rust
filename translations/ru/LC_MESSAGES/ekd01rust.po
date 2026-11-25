@@ -345,6 +345,9 @@ msgstr "Обслуживание"
 msgid "SETTINGS"
 msgstr "НАСТРОЙКИ"
 
+msgid "Screen rotation"
+msgstr "Поворот экрана"
+
 #: ui/menu-labels.slint:165
 msgid "SPEED PER LEVEL"
 msgstr "СКОРОСТЬ ПО УРОВНЯМ"

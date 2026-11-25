@@ -184,6 +184,24 @@ fn existing_component_updates_when_bundled_language_changes() {
     assert_eq!(probe.get_formatted_value(), "-- mm");
     probe.set_item(MenuItem::About);
     assert_eq!(probe.get_label(), "Acerca de");
+    probe.set_item(MenuItem::FlipScreen);
+    assert_eq!(probe.get_label(), "Rotación de pantalla");
+    probe.set_value(DisplayValue {
+        kind: ValueKind::Rotation,
+        flag: true,
+        ..Default::default()
+    });
+    assert_eq!(probe.get_formatted_value(), "180°");
+    probe.set_value(DisplayValue {
+        flag: false,
+        ..probe.get_value()
+    });
+    assert_eq!(probe.get_formatted_value(), "0°");
+    probe.set_item(MenuItem::About);
+    probe.set_value(DisplayValue {
+        kind: ValueKind::Millimetres,
+        ..Default::default()
+    });
     assert!(slint::select_bundled_translation("unavailable").is_err());
     slint::select_bundled_translation("en").unwrap();
     assert_eq!(probe.get_label(), "About");
@@ -215,18 +233,22 @@ fn legacy_language_records_migrate_without_losing_other_preferences() {
         storage::SettingsStore,
     };
     use std::cell::RefCell;
-    for version in 1u32..=5 {
-        for language in [0u32, 1] {
+    for version in 1u32..=6 {
+        for language in [0u32, 1, 2] {
+            if version < 6 && language == 2 {
+                continue;
+            }
             let bus = Rc::new(RefCell::new(crate::soc::flash::Flash::default()));
             let mut bytes = vec![0; if version >= 5 { 92 } else { 88 }];
             let flags = 7
                 | if version >= 2 { 1 << 8 } else { 0 }
                 | if version >= 3 {
-                    (language << 9) | (2 << 10)
+                    (((language == 1) as u32) << 9) | (2 << 10)
                 } else {
                     0
                 }
-                | if version >= 4 { 1 << 12 } else { 0 };
+                | if version >= 4 { 1 << 12 } else { 0 }
+                | if version >= 6 { language << 16 } else { 0 };
             for (offset, value) in [
                 (0, 0x46504b45u32),
                 (4, version),
@@ -262,6 +284,10 @@ fn legacy_language_records_migrate_without_losing_other_preferences() {
                 if version >= 3 { language as u8 } else { 0 }
             );
             assert_eq!(preferences.settings.brightness, 4);
+            assert!(
+                preferences.settings.flip_screen,
+                "Old records must use the new default rotation"
+            );
             assert!(preferences.settings.imperial);
             assert_eq!(preferences.settings.levels, 9);
             assert_eq!(preferences.settings.auto_off_minutes, 7);
@@ -290,7 +316,7 @@ fn legacy_language_records_migrate_without_losing_other_preferences() {
                 preferences
             );
             let migrated = SettingsStore::new(bus).read("/prefs/b").unwrap();
-            assert_eq!(u32::from_le_bytes(migrated[4..8].try_into().unwrap()), 6);
+            assert_eq!(u32::from_le_bytes(migrated[4..8].try_into().unwrap()), 7);
         }
     }
 }

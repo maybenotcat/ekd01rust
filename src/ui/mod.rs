@@ -64,6 +64,7 @@ pub struct UserInterface {
     menu_items: Rc<slint::VecModel<MenuEntry>>,
     first_frame: bool,
     language: core::cell::Cell<Option<u8>>,
+    flip_screen: core::cell::Cell<bool>,
 }
 impl UserInterface {
     pub fn new(display: Display) -> Result<Self, PlatformError> {
@@ -92,6 +93,7 @@ impl UserInterface {
             menu_items,
             first_frame: true,
             language: core::cell::Cell::new(None),
+            flip_screen: core::cell::Cell::new(true),
         })
     }
     pub fn set_language(&self, id: u8) {
@@ -106,6 +108,7 @@ impl UserInterface {
         self.language.set(Some(language.id));
     }
     pub async fn render(&mut self) -> Result<bool, DisplayError> {
+        let rotated = self.display.set_flipped(self.flip_screen.get()).await?;
         if self.first_frame {
             crate::soc::DebugUart::log("[SLINT] FIRST_TIMERS_ENTER\n");
         }
@@ -129,6 +132,11 @@ impl UserInterface {
         });
         if self.first_frame {
             crate::soc::DebugUart::log("[SLINT] FIRST_RASTER_EXIT\n");
+        }
+        // The reused framebuffer is complete even when Slint rasterizes only a
+        // dirty region. Resend it all after changing the panel's address mapping.
+        if rotated {
+            dirty = Some([0, 0, (WIDTH - 1) as u16, (HEIGHT - 1) as u16]);
         }
         if let Some(region) = dirty {
             // Rgb565Pixel is repr(transparent) over u16 in the pinned Slint version.

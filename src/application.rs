@@ -331,7 +331,7 @@ impl Application {
                     self.power_status(StatusCode::PoweringOff);
                 }
                 let action = if self.power.state == PowerState::Running {
-                    self.model.step(keys, now)
+                    self.model.step_physical(keys, now)
                 } else {
                     Actions::empty()
                 };

@@ -859,3 +859,92 @@ fn frozen_oracle_source_integrity() {
         );
     }
 }
+
+#[test]
+fn panel_rotation_toggles_only_mirror_bits_and_restores_each_profile() {
+    for id in [
+        0x00855200, 0x00890100, 0x0081b300, 0x01810000, 0x77895200, 0x00896600,
+    ] {
+        setup(Case::Panel { id });
+        let mut power = ekd01_board::power::Power::<Env>::initialize();
+        let mut display =
+            block_on(ekd01_board::display::Display::<Env>::initialize(&mut power)).unwrap();
+        let mut command = 0;
+        let mut original = None;
+        for run in io::writes() {
+            if run.access.address == LCD_SERIAL_CTRL0_REG {
+                command = run.access.value;
+            }
+            if run.access.address == LCD_SERIAL_DATA0_REG && command == 0x36 {
+                original = Some(run.access.value);
+            }
+        }
+        let original = original.expect("Panel MADCTL");
+        if id == 0x77895200 {
+            assert_eq!(original, 0x70);
+        }
+        for (flipped, expected) in [(true, original ^ 0xc0), (false, original)] {
+            io::reset();
+            assert!(block_on(display.set_flipped(flipped)).unwrap());
+            let serial: Vec<_> = io::writes()
+                .into_iter()
+                .filter(|r| {
+                    r.access.address == LCD_SERIAL_CTRL0_REG
+                        || r.access.address == LCD_SERIAL_DATA0_REG
+                })
+                .map(|r| (r.access.address, r.access.width, r.access.value))
+                .collect();
+            let c = LCD_SERIAL_CTRL0_REG;
+            let d = LCD_SERIAL_DATA0_REG;
+            assert_eq!(
+                serial,
+                vec![
+                    (c, 16, 0x36),
+                    (d, 16, expected),
+                    (c, 16, 0x2a),
+                    (d, 16, 0),
+                    (d, 16, 0),
+                    (d, 16, 1),
+                    (d, 16, 0x3f),
+                    (c, 16, 0x2b),
+                    (d, 16, 0),
+                    (d, 16, 0),
+                    (d, 16, 0),
+                    (d, 16, 0xef),
+                    (c, 16, 0x2c)
+                ]
+            );
+            let length = io::trace().len();
+            assert!(!block_on(display.set_flipped(flipped)).unwrap());
+            assert_eq!(
+                io::trace().len(),
+                length,
+                "Unchanged rotation must do no I/O"
+            );
+        }
+    }
+}
+
+#[test]
+fn panel_rotation_waits_for_dma_and_times_out_without_panel_writes() {
+    setup(Case::Panel { id: 0x77895200 });
+    let mut power = ekd01_board::power::Power::<Env>::initialize();
+    let mut display =
+        block_on(ekd01_board::display::Display::<Env>::initialize(&mut power)).unwrap();
+    io::reset();
+    io::reads(16, LCD_STA_REG, [LCD_STATUS_BUSY_BIT, 0]);
+    assert!(block_on(display.set_flipped(true)).unwrap());
+    assert!(io::ticks() > 0);
+    io::reset();
+    io::fixed(16, LCD_STA_REG, LCD_STATUS_BUSY_BIT);
+    assert!(matches!(
+        block_on(display.set_flipped(false)),
+        Err(ekd01_board::display::DisplayError::DmaIdle)
+    ));
+    assert!(
+        !io::writes()
+            .iter()
+            .any(|r| r.access.address == LCD_SERIAL_CTRL0_REG
+                || r.access.address == LCD_SERIAL_DATA0_REG)
+    );
+}

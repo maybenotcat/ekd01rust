@@ -162,7 +162,7 @@ fn odometer_v4_migrates_to_trip_record_without_losing_other_settings() {
     manager.save(&next).unwrap();
     let bytes = SettingsStore::new(bus.clone()).read("/prefs/b").unwrap();
     assert_eq!(bytes.len(), 92);
-    assert_eq!(u32::from_le_bytes(bytes[4..8].try_into().unwrap()), 6);
+    assert_eq!(u32::from_le_bytes(bytes[4..8].try_into().unwrap()), 7);
     let mut reboot = SettingsManager::new(SettingsStore::new(bus.clone()));
     assert_eq!(reboot.load(), next);
     assert!(matches!(reboot.save(&next).unwrap(), SaveResult::Unchanged));

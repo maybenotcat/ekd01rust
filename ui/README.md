@@ -36,3 +36,10 @@ adds units, padding and localized choices. Large counters use base-10000 parts
 so all u32 digits survive the embedded renderer's floating-point arithmetic.
 `StatusCode` covers operation and power-off messages. Missing data remains
 explicit and must not be rendered as a valid zero.
+
+Display settings include Screen rotation: 180 degrees is the default, while
+0 degrees restores the earlier physical orientation. The panel's MADCTL mirror
+bits perform the rotation; Slint and DMA retain 320x240 geometry. Orientation
+changes wait for DMA to become idle and resend the complete cached framebuffer.
+The same preference swaps physical +/- positions before UI dispatch, including
+hold and repeat events. POWER and the two-button settings shortcut stay unchanged.

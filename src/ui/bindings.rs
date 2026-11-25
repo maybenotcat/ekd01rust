@@ -55,6 +55,7 @@ impl From<Item> for MenuItem {
             Item::ServiceDistance => Self::ServiceDistance,
             Item::Odometer => Self::Odometer,
             Item::About => Self::About,
+            Item::FlipScreen => Self::FlipScreen,
         }
     }
 }
