@@ -1,6 +1,8 @@
-use super::{gpio::Pin, mmio::*, panels::PANELS, pmu::Pmu, registers::*};
-use crate::environment::Runtime;
+use crate::display_profile::EKD_LCD_DMA_TIMEOUT_TICKS;
+use crate::{panels::*, pins, power::Power};
 use core::marker::PhantomData;
+use mt2502_hal::environment::Runtime;
+use mt2502_hal::{gpio::Pin, lcd::Lcd, registers::*};
 
 #[derive(Clone, Copy)]
 pub struct DisplayPins {
@@ -30,8 +32,14 @@ pub struct Display<P: Runtime> {
     first_transfer: bool,
 }
 impl<P: Runtime> Display<P> {
-    pub async fn initialize(pmu: &mut Pmu<P>, pins: DisplayPins) -> Result<Self, DisplayError> {
+    pub async fn initialize(pmu: &mut Power<P>) -> Result<Self, DisplayError> {
         P::log("[LCD] INIT_ENTER\n");
+        let pins = DisplayPins {
+            reset: pins::LCD_RESET,
+            cs: pins::LCD_CS,
+            clock: pins::LCD_CLOCK,
+            bus: pins::LCD_OTHER_BUS,
+        };
         let mut display = unsafe {
             Self {
                 _environment: PhantomData,
@@ -58,32 +66,11 @@ impl<P: Runtime> Display<P> {
         display.clock.output();
         display.clock.disable_pull();
         display.clock.mode(1);
-        write32(DRVPDN_CON0_CLR, EKD_PDN_LCD_CLOCKS);
+        Lcd::enable_clock();
         pmu.enable_lcd_supply();
         P::delay_ms(20).await;
         P::log("[LCD] SUPPLY_SETTLED; BUS_INIT_ENTER\n");
-        update32(
-            LCD_GMCCON_REG,
-            LCD_GMC_THROTTLE_BURST_MASK,
-            EKD_LCD_GMC_BURST,
-        );
-        write32(EKD_LCD_SOFTWARE_TE_REG, EKD_LCD_SOFTWARE_TE_VALUE);
-        update32(CLK_CONDH, EKD_LCD_CLOCK_SELECT_MASK, 0);
-        update16(LCD_SIF_PIX_CON_REG, EKD_LCD_SIF_PIXEL_INIT_CLEAR_MASK, 0);
-        update32(
-            LCD_SIF_CON_REG,
-            EKD_LCD_SIF_INIT_CLEAR_MASK,
-            EKD_LCD_SIF_INIT_SET_BITS,
-        );
-        write32(
-            LCD_SIF0_TIMING_REG,
-            (read32(LCD_SIF0_TIMING_REG) & EKD_LCD_SIF_TIMING_PRESERVE_MASK) | EKD_LCD_SIF0_TIMING,
-        );
-        update32(
-            EKD_GPIO_DRV_BANK1,
-            EKD_LCD_PAD_DRIVE_MASK,
-            EKD_LCD_PAD_DRIVE_VALUE,
-        );
+        Lcd::configure_bus(&crate::display_profile::BUS);
         P::log("[LCD] BUS_INIT_EXIT; READ_ID_ENTER\n");
         let id = display.read_id().await;
         P::hex("[LCD] ID", id);
@@ -161,25 +148,10 @@ impl<P: Runtime> Display<P> {
         Ok(display)
     }
     fn settle() {
-        for _ in 0..20 {
-            unsafe {
-                core::arch::asm!("nop", options(nomem, nostack));
-            }
-        }
+        Lcd::settle();
     }
     fn bus_write(&mut self, data: bool, value: u16, width: u8) {
-        update32(LCD_SIF_CON_REG, LCD_SERIAL_CONFIG_SIF0_SIZE_MASK, 0);
-        let register = if data {
-            LCD_SERIAL_DATA0_REG
-        } else {
-            LCD_SERIAL_CTRL0_REG
-        };
-        if width == 1 {
-            write8(register, value as u8);
-        } else {
-            write16(register, value);
-        }
-        Self::settle();
+        Lcd::write_serial(data, value, width);
     }
     fn transfer(&mut self, data: bool, value: u8) {
         self.cs.set(false);
@@ -193,11 +165,7 @@ impl<P: Runtime> Display<P> {
         self.transfer(true, value);
     }
     fn repeat(&mut self, value: u8, count: u32) {
-        update32(LCD_SIF_CON_REG, LCD_SERIAL_CONFIG_SIF0_SIZE_MASK, 0);
-        for _ in 0..count {
-            write8(LCD_SERIAL_DATA0_REG, value);
-        }
-        Self::settle();
+        Lcd::repeat(value, count);
     }
     async fn read_id(&mut self) -> u32 {
         self.reset.set(true);
@@ -215,7 +183,7 @@ impl<P: Runtime> Display<P> {
         self.clock.mode(1);
         let mut id = 0;
         for _ in 0..4 {
-            id = (id << 8) | read8(LCD_SERIAL_DATA0_REG) as u32;
+            id = (id << 8) | Lcd::read_byte() as u32;
         }
         self.cs.set(true);
         P::delay_ms(1).await;
@@ -237,15 +205,13 @@ impl<P: Runtime> Display<P> {
         self.command(DCS_WRITE_MEMORY_START as u8);
     }
     fn stop_dma(&mut self) {
-        write16(LCD_START_REG, 0);
-        update32(LCD_ROI_CTRL_REG, LCD_ROI_CTRL_LAYER_MASK, 0);
-        write16(LCD_INT_ENABLE_REG, 0);
+        Lcd::stop_dma();
         self.cs.set(true);
     }
     fn fail(&mut self, error: DisplayError) -> Result<(), DisplayError> {
         self.stop_dma();
         self.failed = true;
-        P::hex("[LCD] DMA_STATUS", read16(LCD_STA_REG) as u32);
+        P::hex("[LCD] DMA_STATUS", Lcd::status());
         Err(error)
     }
     pub async fn present(&mut self, pixels: &[u16], region: [u16; 4]) -> Result<(), DisplayError> {
@@ -253,12 +219,12 @@ impl<P: Runtime> Display<P> {
             return Err(DisplayError::Disabled);
         }
         let [x0, y0, x1, y1] = region;
-        let address = pixels.as_ptr() as u32;
+        let address = mt2502_hal::dma::physical_address(pixels.as_ptr());
         let trace = core::mem::replace(&mut self.first_transfer, false);
         if trace {
-            let cpsr = crate::cpu::status();
+            let cpsr = cpu_status();
             P::hex("[LCD] DMA_ENTER_CPSR", cpsr);
-            P::hex("[LCD] DMA_ENTER_STATUS", read16(LCD_STA_REG) as u32);
+            P::hex("[LCD] DMA_ENTER_STATUS", Lcd::status());
             P::hex("[LCD] DMA_REGION_BEGIN", (y0 as u32) << 16 | x0 as u32);
             P::hex("[LCD] DMA_REGION_END", (y1 as u32) << 16 | x1 as u32);
         }
@@ -281,7 +247,7 @@ impl<P: Runtime> Display<P> {
         if trace {
             P::hex("[LCD] DMA_IDLE_WAIT_TICK", started);
         }
-        while read16(LCD_STA_REG) as u32 & (LCD_STATUS_RUN_BIT | LCD_STATUS_BUSY_BIT) != 0 {
+        while Lcd::status() & (LCD_STATUS_RUN_BIT | LCD_STATUS_BUSY_BIT) != 0 {
             if P::now().wrapping_sub(started) >= EKD_LCD_DMA_TIMEOUT_TICKS {
                 return self.fail(DisplayError::DmaIdle);
             }
@@ -290,71 +256,37 @@ impl<P: Runtime> Display<P> {
         if trace {
             P::log("[LCD] DMA_IDLE_READY\n");
         }
-        write32(DRVPDN_CON0_CLR, EKD_PDN_LCD_CLOCKS);
-        write32(IRQ_MASK_SET0, 1 << EKD_IRQ_LCD_LINE);
-        write16(LCD_START_REG, 0);
-        write16(LCD_INT_ENABLE_REG, LCD_INT_ENABLE_COMPLETE_BIT as u16);
-        let _ = read16(LCD_INT_STATUS_REG);
-        write32(LCD_TECON_REG, 0);
+        Lcd::prepare_dma();
         self.window(x0, y0, x1, y1);
         if trace {
             P::log("[LCD] DMA_WINDOW_READY\n");
         }
-        write32(
-            LCD_ROI_CTRL_REG,
-            LCD_LAYER_ENABLE_BIT(0) | EKD_LCD_ROI_FORMAT_RGB565_SERIAL,
+        Lcd::configure_rgb565(
+            address,
+            WIDTH as u32,
+            HEIGHT as u32,
+            region,
+            EKD_LCD_DESTINATION_BIAS,
         );
-        write32(
-            LCD_ROI_OFFSET_REG,
-            ((y0 as u32 + EKD_LCD_DESTINATION_BIAS) << 16) | (x0 as u32 + EKD_LCD_DESTINATION_BIAS),
-        );
-        write32(LCD_ROI_CMD_ADDR_REG, LCD_SERIAL_CTRL0_REG);
-        write32(LCD_ROI_DATA_ADDR_REG, LCD_SERIAL_DATA0_REG);
-        write32(
-            LCD_ROI_SIZE_REG,
-            ((y1 - y0 + 1) as u32) << 16 | (x1 - x0 + 1) as u32,
-        );
-        write32(LCD_ROI_BG_COLOR_REG, 0);
-        for offset in (0..32).step_by(4) {
-            write32(LCD_LAYER0_BASE_ADDR + offset, 0);
-        }
-        write32(
-            LCD_LAYER0_CTRL_REG,
-            EKD_LCD_LAYER_RGB565 << LCD_LAYER_CTRL_FORMAT_OFFSET,
-        );
-        write32(LCD_LAYER0_SRC_KEY_REG, 0);
-        write32(
-            LCD_LAYER0_OFFSET_REG,
-            (EKD_LCD_DESTINATION_BIAS << 16) | EKD_LCD_DESTINATION_BIAS,
-        );
-        write32(LCD_LAYER0_BUFF_ADDR_REG, address);
-        write32(LCD_LAYER0_SIZE_REG, (HEIGHT as u32) << 16 | WIDTH as u32);
-        write32(LCD_LAYER0_MEM_OFFSET_REG, 0);
-        write32(LCD_LAYER0_MEM_PITCH_REG, (WIDTH * 2) as u32);
         if trace {
             P::log("[LCD] DMA_REGISTERS_READY\n");
         }
-        core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
         unsafe {
-            core::ptr::read_volatile(pixels.as_ptr().add(WIDTH * HEIGHT - 1));
+            Lcd::flush_framebuffer(pixels.as_ptr(), WIDTH * HEIGHT);
         }
-        let _ = read32(LCD_LAYER0_BUFF_ADDR_REG);
         self.cs.set(false);
-        let _ = read16(LCD_INT_STATUS_REG);
+        Lcd::clear_pending();
         let started = P::now();
-        write16(LCD_START_REG, 0);
-        write16(LCD_START_REG, LCD_START_BIT as u16);
-        let _ = read16(LCD_START_REG);
+        Lcd::start();
         if trace {
-            P::hex("[LCD] DMA_STARTED_STATUS", read16(LCD_STA_REG) as u32);
+            P::hex("[LCD] DMA_STARTED_STATUS", Lcd::status());
             P::hex("[LCD] DMA_STARTED_TICK", P::now());
         }
         let mut saw_run = false;
         let mut complete = false;
         loop {
-            let running =
-                read16(LCD_STA_REG) as u32 & (LCD_STATUS_RUN_BIT | LCD_STATUS_BUSY_BIT) != 0;
-            complete |= read16(LCD_INT_STATUS_REG) as u32 & LCD_INT_STATUS_COMPLETE_BIT != 0;
+            let running = Lcd::status() & (LCD_STATUS_RUN_BIT | LCD_STATUS_BUSY_BIT) != 0;
+            complete |= Lcd::completion_pending();
             saw_run |= running;
             if (complete || saw_run) && !running {
                 break;
@@ -365,8 +297,19 @@ impl<P: Runtime> Display<P> {
             P::delay_ticks(1).await;
         }
         self.stop_dma();
-        write32(IRQ_EOIOH0, 1 << EKD_IRQ_LCD_LINE);
+        Lcd::acknowledge_interrupt();
         Self::settle();
         Ok(())
     }
+}
+
+fn cpu_status() -> u32 {
+    #[cfg(target_arch = "arm")]
+    {
+        mt2502_hal::cpu::status()
+    }
+    #[cfg(not(target_arch = "arm"))]
+    {
+        0
+    } // Diagnostic unavailable on the native test host.
 }

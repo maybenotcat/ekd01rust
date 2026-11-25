@@ -1,0 +1,11 @@
+[package]
+name = "mt2502-register-reference"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+mt2502-hal = { path = "../../mt2502-hal", features = ["register-tests"] }
+critical-section = { version = "1.2", features = ["std"] }
+embedded-storage = "0.3.1"
+embedded-io = "0.7"

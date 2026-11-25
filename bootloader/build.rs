@@ -14,12 +14,15 @@ fn main() {
         &[
             "bootloader",
             "mt2502-hal",
+            "ekd01-board/src",
+
             "boot-contract",
             "third_party/embassy-sync",
             "third_party/embassy-hal-internal",
         ],
         &[
             "Cargo.toml",
+            "ekd01-board/Cargo.toml",
             "Cargo.lock",
             "build-support/identity.rs",
             "rust-toolchain.toml",

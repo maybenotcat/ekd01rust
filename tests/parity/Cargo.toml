@@ -7,6 +7,7 @@ publish = false
 [workspace]
 
 [dependencies]
+ekd01-board = { path = "../../ekd01-board" }
 mt2502-hal = { path = "../../mt2502-hal" }
 bitflags = "2"
 critical-section = { version = "1.2", features = ["std"] }

@@ -1,7 +1,7 @@
 use super::{DebugUart, pmu::Pmu};
 use crate::board::pins;
 use crate::input::{ButtonEvents, ButtonFilter};
-use mt2502_hal::key_matrix::KeyMatrix;
+use ekd01_board::keys::KeyMatrix;
 
 pub struct Buttons {
     filter: ButtonFilter,

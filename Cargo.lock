@@ -1273,6 +1273,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "ekd01-board"
+version = "0.1.0"
+dependencies = [
+ "critical-section",
+ "embedded-storage",
+ "mt2502-hal",
+ "mt2502-register-reference",
+ "sha2",
+]
+
+[[package]]
 name = "ekd01-boot-contract"
 version = "0.1.0"
 dependencies = [
@@ -1285,6 +1296,7 @@ name = "ekd01-bootloader"
 version = "0.1.0"
 dependencies = [
  "critical-section",
+ "ekd01-board",
  "ekd01-boot-contract",
  "embassy-boot",
  "embedded-storage",
@@ -1310,6 +1322,7 @@ dependencies = [
  "bt-hci",
  "bt-hci-transport",
  "critical-section",
+ "ekd01-board",
  "ekd01-boot-contract",
  "embassy-boot",
  "embassy-executor",
@@ -3176,6 +3189,16 @@ dependencies = [
  "critical-section",
  "embedded-io",
  "embedded-storage",
+]
+
+[[package]]
+name = "mt2502-register-reference"
+version = "0.1.0"
+dependencies = [
+ "critical-section",
+ "embedded-io",
+ "embedded-storage",
+ "mt2502-hal",
 ]
 
 [[package]]
@@ -6736,8 +6759,8 @@ checksum = "ec7a2a501ed189703dba8b08142f057e887dfc4b2cc4db2d343ac6376ba3e0b9"
 name = "xtask"
 version = "0.1.0"
 dependencies = [
+ "ekd01-board",
  "ekd01-boot-contract",
- "mt2502-hal",
  "serde_json",
  "sha1",
  "sha2",

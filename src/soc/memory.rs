@@ -4,7 +4,7 @@ unsafe extern "C" {
     static __heap_start: u8;
     static __heap_end: u8;
 }
-type Hardware = mt2502_hal::memory::Memory<super::Environment>;
+type Hardware = ekd01_board::memory::Memory<super::Environment>;
 pub struct Memory;
 impl Memory {
     pub fn heap_range() -> (usize, usize) {

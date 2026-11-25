@@ -11,6 +11,8 @@ fn main() {
             "src",
             "platform",
             "mt2502-hal",
+            "ekd01-board/src",
+
             "boot-contract",
             "ui",
             "assets",
@@ -20,6 +22,7 @@ fn main() {
         ],
         &[
             "Cargo.toml",
+            "ekd01-board/Cargo.toml",
             "Cargo.lock",
             "build.rs",
             "build-support/identity.rs",

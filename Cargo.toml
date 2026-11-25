@@ -6,11 +6,12 @@ publish = false
 build = "build.rs"
 
 [workspace]
-members = ["xtask", "flasher", "ble-client", "boot-contract", "bootloader", "mt2502-hal"]
+members = ["xtask", "flasher", "ble-client", "boot-contract", "bootloader", "mt2502-hal", "ekd01-board", "tests/register-reference"]
 default-members = ["."]
 resolver = "3"
 
 [dependencies]
+ekd01-board = { path = "ekd01-board" }
 mt2502-hal = { path = "mt2502-hal" }
 ekd01-boot-contract = { path = "boot-contract" }
 embassy-boot = "=0.7.0"

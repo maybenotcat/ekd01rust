@@ -1,0 +1,16 @@
+[package]
+name = "ekd01-board"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+mt2502-hal = { path = "../mt2502-hal" }
+critical-section = "1.2"
+
+[dev-dependencies]
+sha2 = "0.10"
+embedded-storage = "0.3.1"
+mt2502-hal = { path = "../mt2502-hal", features = ["register-tests"] }
+mt2502-register-reference = { path = "../tests/register-reference" }
+critical-section = { version = "1.2", features = ["std"] }

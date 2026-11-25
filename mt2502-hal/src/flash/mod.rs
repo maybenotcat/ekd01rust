@@ -160,5 +160,3 @@ impl embedded_storage::nor_flash::NorFlashError for FlashError {
 
 mod region;
 pub use region::{FlashController, FlashRegion, RegionBounds};
-
-pub mod gd25lq64_profile;

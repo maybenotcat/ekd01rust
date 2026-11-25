@@ -40,6 +40,9 @@ impl CurrentSinks {
             configuration as u32,
         );
     }
+    pub fn set_current_step(&mut self, channel: Channel, step: u32) {
+        update16(channel.control(), ISINK_STEP_MASK, step << ISINK_STEP_SHIFT);
+    }
     pub fn enable(&mut self, channel: Channel) {
         update16(channel.control(), 0, ISINK_EN_MASK);
     }

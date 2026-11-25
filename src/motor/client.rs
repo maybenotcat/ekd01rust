@@ -118,7 +118,7 @@ pub struct MotorClient {
 impl MotorClient {
     pub fn start(now: u32) -> Self {
         Self {
-            uart: BridgeUart::initialize(crate::board::pins::MCU_RX, crate::board::pins::MCU_TX),
+            uart: BridgeUart::initialize(),
             parser: BridgeParser::new(),
             status: BikeStatus {
                 levels: 5,

@@ -19,3 +19,32 @@ impl Uart1 {
         false
     }
 }
+
+impl Uart1 {
+    pub fn initialize(divisor: u16) {
+        // Configure 8N1 with the divisor chosen for the caller's UART clock.
+        write16(UART1_base + 0x0c, 0x83);
+        write16(UART1_base, divisor);
+        write16(UART1_base + 4, 0);
+        write16(UART1_base + 0x0c, 3);
+        write16(UART1_base + 8, 0x47);
+        write16(UART1_base + 0x10, 3);
+        write16(UART1_base + 4, 0);
+        write16(UART1_base + 0x24, 0);
+    }
+}
+impl Uart1 {
+    pub fn wait_transmitter_empty(limit: u32) -> bool {
+        for _ in 0..limit {
+            if read16(UART_LSR(UART1_base)) as u32 & UART_LSR_TEMT != 0 {
+                return true;
+            }
+        }
+        false
+    }
+    pub fn wait_transmitter_empty_feeding_watchdog() {
+        while read16(UART_LSR(UART1_base)) as u32 & UART_LSR_TEMT == 0 {
+            crate::watchdog::Watchdog::feed();
+        }
+    }
+}

@@ -112,7 +112,7 @@ pub mod soc {
         }
         pub struct BridgeUart;
         impl BridgeUart {
-            pub fn initialize(_rx: u32, _tx: u32) -> Self {
+            pub fn initialize() -> Self {
                 Self
             }
             pub fn receive(&mut self) -> Option<u8> {

@@ -15,11 +15,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "790eea4361631c5e7d22598ecd5723ff611904e3344ce8720784c93e3d83d40b"
 
 [[package]]
+name = "ekd01-board"
+version = "0.1.0"
+dependencies = [
+ "critical-section",
+ "mt2502-hal",
+]
+
+[[package]]
 name = "ekd01rust-parity"
 version = "0.1.0"
 dependencies = [
  "bitflags",
  "critical-section",
+ "ekd01-board",
  "littlefs2-rust",
  "mt2502-hal",
 ]

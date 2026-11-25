@@ -1,23 +1,13 @@
-use super::{gpio::Pin, mmio::*, registers::*};
-use crate::environment::Trace;
-use core::marker::PhantomData;
+pub mod startup;
+use crate::{error::Error, mmio::*, registers::*};
 
 #[derive(Clone, Copy)]
 pub struct ClockTime {
     pub hour: u8,
     pub minute: u8,
 }
-pub struct Rtc<P: Trace> {
-    latch: u32,
-    _environment: PhantomData<P>,
-}
-impl<P: Trace> Rtc<P> {
-    pub const fn new(latch: u32) -> Self {
-        Self {
-            latch,
-            _environment: PhantomData,
-        }
-    }
+pub struct Rtc;
+impl Rtc {
     fn ready() -> bool {
         (0..100_000).any(|_| read16(RTC_BBPU) as u32 & EKD_RTC_CBUSY == 0)
     }
@@ -51,18 +41,21 @@ impl<P: Trace> Rtc<P> {
         }
         None
     }
-    pub fn set(&mut self, time: ClockTime) -> bool {
+    pub fn try_set(&mut self, time: ClockTime) -> Result<bool, Error> {
         if time.hour >= 24 || time.minute >= 60 {
-            return false;
+            return Ok(false);
         }
         critical_section::with(|_| {
             if !Self::ready() || !Self::unlock() {
-                return false;
+                return Err(Error::RtcBusy);
             }
             write16(RTC_TC_HOU, time.hour as u16);
             write16(RTC_TC_MIN, time.minute as u16);
             write16(RTC_TC_SEC, 0);
-            Self::commit()
+            if !Self::commit() {
+                return Err(Error::RtcBusy);
+            }
+            Ok(true)
         })
     }
     fn oscillator_shutdown() -> bool {
@@ -87,28 +80,20 @@ impl<P: Trace> Rtc<P> {
         update16(RTC_BBPU, 0, EKD_RTC_RELOAD_KEY);
         Self::commit()
     }
-    pub fn release_power(&mut self) -> bool {
-        critical_section::with(|_| {
-            P::log("[POWER] SHUTDOWN_ENTER\n");
-            if !Self::ready() || !Self::unlock() || !Self::oscillator_shutdown() {
-                return false;
-            }
-            let mut latch = unsafe { Pin::claim(self.latch) };
-            latch.set(false);
-            latch.output();
-            latch.mode(0);
-            update16(TEST_CON0, EKD_PMU_PWKEY_LONG_PRESS_EN, 0);
-            update16(TEST_CON0, EKD_PMU_PWKEY_TRIGGER, 0);
-            update16(TEST_CON0, 0, EKD_PMU_PWKEY_TRIGGER);
-            update16(TEST_CON0, EKD_PMU_PWKEY_TRIGGER, 0);
-            P::log("[POWER] RTC_RELEASE; USB may retain power\n");
-            for _ in 0..100_000 {
-                if read16(UART_LSR(UART1_base)) as u32 & UART_LSR_TEMT != 0 {
-                    break;
-                }
-            }
-            update16(RTC_BBPU, EKD_RTC_BBPU_POWER_LATCH, EKD_RTC_RELEASE_KEY);
-            Self::commit() && read16(RTC_BBPU) as u32 & EKD_RTC_BBPU_POWER_LATCH == 0
-        })
+    pub fn prepare_shutdown(&self) -> Result<(), Error> {
+        if !Self::ready() || !Self::unlock() || !Self::oscillator_shutdown() {
+            return Err(Error::RtcBusy);
+        }
+        Ok(())
+    }
+    pub fn release_power_latch(&self) -> Result<(), Error> {
+        update16(RTC_BBPU, EKD_RTC_BBPU_POWER_LATCH, EKD_RTC_RELEASE_KEY);
+        if !Self::commit() {
+            return Err(Error::RtcBusy);
+        }
+        if read16(RTC_BBPU) as u32 & EKD_RTC_BBPU_POWER_LATCH != 0 {
+            return Err(Error::PowerLatchFailed);
+        }
+        Ok(())
     }
 }

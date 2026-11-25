@@ -249,10 +249,7 @@ impl<P: BootEnvironment> Startup<P> {
         for offset in (0..64).step_by(4) {
             let word = read32(vector_source + offset);
             // Physical vector zero is valid hardware memory, not a Rust pointer.
-            unsafe {
-                core::arch::asm!("str {word}, [{address}]", word = in(reg) word,
-            address = in(reg) offset, options(nostack, preserves_flags));
-            }
+            write_physical_word(offset, word);
         }
     }
 

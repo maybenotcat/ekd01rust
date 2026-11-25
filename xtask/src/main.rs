@@ -3,7 +3,7 @@ mod build;
 mod elf;
 mod package;
 #[cfg(test)]
-use mt2502_hal::flash::gd25lq64_profile as sfi_profile;
+use ekd01_board::flash_profile as sfi_profile;
 
 use std::{
     path::{Path, PathBuf},

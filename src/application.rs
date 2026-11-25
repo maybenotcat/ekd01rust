@@ -70,17 +70,9 @@ impl Application {
         let preferences = settings.load();
         let model = UiModel::new(preferences);
         let mut pmu = Pmu::initialize();
-        let display = Display::initialize(
-            &mut pmu,
-            crate::soc::display::DisplayPins {
-                reset: crate::board::pins::LCD_RESET,
-                cs: crate::board::pins::LCD_CS,
-                clock: crate::board::pins::LCD_CLOCK,
-                bus: crate::board::pins::LCD_OTHER_BUS,
-            },
-        )
-        .await
-        .expect("LCD initialization");
+        let display = Display::initialize(&mut pmu)
+            .await
+            .expect("LCD initialization");
         let ui = UserInterface::new(display).expect("Slint platform");
         let mut backlight = Backlight::initialize();
         backlight.set_level(model.preferences.settings.brightness);
@@ -100,7 +92,7 @@ impl Application {
         Self {
             flash: bus,
             pmu,
-            rtc: Rtc::new(crate::board::pins::POWER_LATCH),
+            rtc: Rtc::new(),
             backlight,
             buttons,
             motor,

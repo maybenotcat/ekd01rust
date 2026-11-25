@@ -44,7 +44,9 @@ initialization (command 0815 -> 1002cf1c), retained keys, low-power detector
 reset, alarm/IRQ initialization, readback checks and BBPU power latching.
 
 Common flash/MMIO/register/PMU data lives in the `mt2502-hal` crate, linked into both
-firmware crates. Neither crate imports drivers from the other's source tree.
+firmware crates. N22 profiles, wiring, power policy and startup order live in the
+shared `ekd01-board` crate. HAL returns typed errors; loader chooses stop policy.
+Neither binary imports drivers from the other's source tree.
 The application owns its scheduler, LCD, MCU bridge and Bluetooth initialization.
 No SDK object, MAUI, FAT or Redstone code is linked.
 

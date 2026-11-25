@@ -1,6 +1,7 @@
 //! EKD01 N22 backlight wiring and brightness policy.
-use super::DebugUart;
-use crate::board::pins;
+use crate::pins;
+use core::marker::PhantomData;
+use mt2502_hal::environment::Trace;
 use mt2502_hal::{
     gpio::Pin,
     pmu::isink::{CONFIGURATION_24MA_PWM, Channel, CurrentSinks},
@@ -14,7 +15,8 @@ const DUTY_STEPS: u32 = 81;
 const BRIGHTNESS_STEP_PERCENT: u32 = 12;
 const LEGACY_PWM3_CONTROL: u16 = 7;
 
-pub struct Backlight {
+pub struct Backlight<P: Trace> {
+    _environment: PhantomData<P>,
     _gates: [Pin; 2],
     _pwm_pin: Pin,
     _legacy_pwm: Pwm3,
@@ -22,7 +24,7 @@ pub struct Backlight {
     pwm: Pwm4,
     level: u8,
 }
-impl Backlight {
+impl<P: Trace> Backlight<P> {
     pub fn initialize() -> Self {
         // Board assigns these pads and peripherals once, after PMU initialization.
         let mut gates = unsafe { pins::BACKLIGHT_GATES.map(|number| Pin::claim(number)) };
@@ -55,8 +57,9 @@ impl Backlight {
             sinks.enable(Channel::Zero);
             sinks.enable(Channel::One);
         });
-        DebugUart::log("[LCD] BACKLIGHT_PWM4_GPIO19\n");
+        P::log("[LCD] BACKLIGHT_PWM4_GPIO19\n");
         Self {
+            _environment: PhantomData,
             _gates: gates,
             _pwm_pin: pwm_pin,
             _legacy_pwm: legacy_pwm,

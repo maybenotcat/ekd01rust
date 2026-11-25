@@ -1,10 +1,6 @@
 #![no_std]
 #![no_main]
 
-type Emi = mt2502_hal::boot::emi::Emi<soc::Environment>;
-type RtcBoot = mt2502_hal::boot::rtc::RtcBoot<soc::Environment>;
-type Sfi = mt2502_hal::boot::sfi::Sfi<soc::Environment>;
-
 mod soc;
 mod storage;
 
@@ -49,28 +45,15 @@ extern "C" fn boot_main(parameters: u32) -> ! {
     let usb_boot = parameters & 3 == 0
         && (0x7000_0000..0x7000_5758).contains(&parameters)
         && soc::mmio::read32(parameters + 2216) & 2 != 0;
-    soc::Hardware::initialize_clocks(usb_boot);
-    soc::Hardware::initialize_uart();
+    soc::Board::initialize_clocks(usb_boot)
+        .unwrap_or_else(|error| stop(ekd01_board::error::boot_message(error)));
+    soc::Board::initialize_uart();
     DebugUart::log("[BOOT] EKD01 EMBASSY; single loader; UART1 115200\n");
     DebugUart::log("[BOOT] BUILD_ID=");
     DebugUart::log(BUILD_ID);
     DebugUart::log("\n");
-    Emi::initialize();
-    RtcBoot::initialize_oscillator();
-    soc::Hardware::stabilize_32k();
-    DebugUart::hex(
-        "[BOOT] EMI_GENA",
-        soc::mmio::read32(soc::registers::EMI_GENA),
-    );
-    if !soc::Hardware::probe_psram([0x00100000, 0x00300000, 0x006efffc]) {
-        stop("[BOOT] PSRAM_PROBE_FAILED\n");
-    }
-    DebugUart::log("[BOOT] PSRAM_OK\n");
-    soc::Hardware::prepare_runtime(0x70006140);
-    Sfi::initialize();
-    soc::Hardware::initialize_power();
-    soc::Hardware::release_usb_download_power();
-    soc::Hardware::latch_power();
+    unsafe { soc::Board::initialize_platform() }
+        .unwrap_or_else(|error| stop(ekd01_board::error::boot_message(error)));
     // Exclusive physical owner; all three Embassy Boot views borrow this device.
     let controller = unsafe { soc::flash::FlashController::attach() };
     DebugUart::hex("[FLASH] JEDEC", controller.jedec().unwrap_or(0));
@@ -99,8 +82,8 @@ extern "C" fn boot_main(parameters: u32) -> ! {
         stop("[BOOT] INVALID_APPLICATION\n");
     }
     DebugUart::hex("[BOOT] JUMP", layout::APPLICATION_ENTRY);
-    soc::Hardware::finish_handoff();
-    soc::Hardware::arm_application_watchdog();
+    soc::Board::finish_handoff();
+    soc::Board::arm_application_watchdog();
     unsafe extern "C" {
         fn boot_jump(entry: u32, trial: u32) -> !;
     }

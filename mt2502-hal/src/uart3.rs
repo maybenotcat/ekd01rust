@@ -1,17 +1,24 @@
 use super::{gpio::Pin, mmio::*, registers::*, ring::RxRing};
-use crate::environment::Trace;
-use core::marker::PhantomData;
 
 // Embassy rendering is cooperative. Buffer beyond one C task timeslice without
 // dropping a burst while Slint finishes a synchronous raster operation.
 static RX: RxRing<8192> = RxRing::new();
-pub struct Uart3<P: Trace> {
-    _environment: PhantomData<P>,
+pub struct RateConfiguration {
+    pub fix: u32,
+    pub fraction_l: u32,
+    pub fraction_m: u32,
+    pub step: u32,
+    pub divisor_l: u32,
+    pub divisor_h: u32,
+    pub step_count: u32,
+    pub sample_count: u32,
+}
+pub struct Uart3 {
     _rx: Pin,
     _tx: Pin,
 }
-impl<P: Trace> Uart3<P> {
-    pub fn initialize(rx_pin: u32, tx_pin: u32) -> Self {
+impl Uart3 {
+    pub fn initialize(rx_pin: u32, tx_pin: u32, rate: RateConfiguration) -> Self {
         let mut rx = unsafe { Pin::claim(rx_pin) };
         let mut tx = unsafe { Pin::claim(tx_pin) };
         critical_section::with(|_| {
@@ -34,15 +41,15 @@ impl<P: Trace> Uart3<P> {
                 (UART_LCR(b), UART_LCR_8N1),
                 (UART_MCR(b), 0),
                 (UART_ESCAPE_EN(b), 0),
-                (UART_RATE_FIX_REG(b), 15),
-                (UART_FRACDIV_L(b), 0x55),
-                (UART_FRACDIV_M(b), 0),
-                (UART_RATE_STEP(b), 3),
+                (UART_RATE_FIX_REG(b), rate.fix),
+                (UART_FRACDIV_L(b), rate.fraction_l),
+                (UART_FRACDIV_M(b), rate.fraction_m),
+                (UART_RATE_STEP(b), rate.step),
                 (UART_LCR(b), UART_LCR_DLAB | UART_LCR_8N1),
-                (UART_DLL(b), 1),
-                (UART_DLH(b), 0),
-                (UART_STEP_COUNT(b), 55),
-                (UART_SAMPLE_COUNT(b), 27),
+                (UART_DLL(b), rate.divisor_l),
+                (UART_DLH(b), rate.divisor_h),
+                (UART_STEP_COUNT(b), rate.step_count),
+                (UART_SAMPLE_COUNT(b), rate.sample_count),
                 (UART_LCR(b), UART_LCR_8N1),
                 (UART_FCR(b), UART_FCR_FIFOINI),
             ] {
@@ -54,12 +61,8 @@ impl<P: Trace> Uart3<P> {
             write16(UART_IER(b), (UART_IER_ERBFI | UART_IER_ELSI) as u16);
             write32(IRQ_MASK_CLR0, 1 << EKD_IRQ_UART3_LINE);
         });
-        P::log("[BRIDGE] UART3 230400; IRQ29; MCU retained\n");
-        Self {
-            _environment: PhantomData,
-            _rx: rx,
-            _tx: tx,
-        }
+
+        Self { _rx: rx, _tx: tx }
     }
     pub fn irq() {
         for _ in 0..128 {

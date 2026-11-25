@@ -1,7 +1,7 @@
 //! Loader policy and diagnostic adapter; hardware operations are provided by HAL.
 #![allow(dead_code)]
 mod critical;
-pub use mt2502_hal::{flash, mmio, registers};
+pub use mt2502_hal::{flash, mmio};
 pub struct Environment;
 impl mt2502_hal::environment::Trace for Environment {
     fn log(text: &str) {
@@ -11,12 +11,7 @@ impl mt2502_hal::environment::Trace for Environment {
         DebugUart::hex(name, value);
     }
 }
-impl mt2502_hal::environment::BootEnvironment for Environment {
-    fn stop(message: &str) -> ! {
-        crate::stop(message)
-    }
-}
-pub type Hardware = mt2502_hal::boot::startup::Startup<Environment>;
+pub type Board = ekd01_board::boot::Boot<Environment>;
 
 pub struct DebugUart;
 impl DebugUart {

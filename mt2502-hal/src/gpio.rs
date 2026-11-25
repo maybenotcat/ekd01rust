@@ -43,7 +43,34 @@ impl Pin {
             GPIO_PIN_MASK(self.number),
         );
     }
+    /// Enable the verified pull-up circuit on GPIO bank zero.
+    pub fn pull_up(&mut self) {
+        assert!(
+            self.number < 32,
+            "pull-up configuration is implemented for bank zero"
+        );
+        write32(GPIO_R0_CLR_REG0, 1 << self.number);
+        write32(GPIO_R1_SET_REG0, 1 << self.number);
+        write32(GPIO_PUPD0_CLR, 1 << self.number);
+        write32(GPIO_PULLSEL0_SET, 1 << self.number);
+        write32(GPIO_PULL0_SET, 1 << self.number);
+    }
+    pub fn set_input_inverted(&mut self, inverted: bool) {
+        assert!(
+            self.number < 32,
+            "input inversion is implemented for bank zero"
+        );
+        update32(
+            GPIO_DINV0,
+            1 << self.number,
+            if inverted { 1 << self.number } else { 0 },
+        );
+    }
     pub fn high(&self) -> bool {
         read32(GPIO_BANK(GPIO_INPUT_LEVEL0, self.number)) & GPIO_PIN_MASK(self.number) != 0
     }
+}
+
+pub fn input_bank_zero() -> u32 {
+    read32(GPIO_INPUT_LEVEL0)
 }

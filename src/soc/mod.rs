@@ -23,24 +23,26 @@ impl mt2502_hal::environment::Runtime for Environment {
         embassy_time::Timer::after_ticks(ticks).await;
     }
 }
-pub mod backlight;
+pub mod backlight {
+    pub type Backlight = ekd01_board::backlight::Backlight<super::Environment>;
+}
 pub mod bridge_uart {
-    pub type BridgeUart = mt2502_hal::uart3::Uart3<super::Environment>;
+    pub type BridgeUart = ekd01_board::bridge_uart::BridgeUart<super::Environment>;
 }
 pub mod btif {
     pub type Btif = mt2502_hal::btif::Btif<super::Environment>;
     pub use mt2502_hal::btif::BtifError;
 }
 pub mod pmu {
-    pub type Pmu = mt2502_hal::pmu::Pmu<super::Environment>;
+    pub type Pmu = ekd01_board::power::Power<super::Environment>;
 }
 pub mod rtc {
-    pub type Rtc = mt2502_hal::rtc::Rtc<super::Environment>;
+    pub type Rtc = ekd01_board::rtc::Rtc<super::Environment>;
     pub use mt2502_hal::rtc::ClockTime;
 }
 pub mod display {
-    pub type Display = mt2502_hal::display::Display<super::Environment>;
-    pub use mt2502_hal::display::{DisplayError, DisplayPins, HEIGHT, WIDTH};
+    pub type Display = ekd01_board::display::Display<super::Environment>;
+    pub use ekd01_board::display::{DisplayError, HEIGHT, WIDTH};
 }
 
 use core::fmt;

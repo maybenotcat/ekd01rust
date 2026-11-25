@@ -12,6 +12,3 @@ pub trait Runtime: Trace {
         Self::delay_ticks((ms * 128 + 999) / 1000 + 1).await;
     }
 }
-pub trait BootEnvironment: Trace {
-    fn stop(message: &str) -> !;
-}
