@@ -9,6 +9,7 @@ mod board;
 mod boot;
 mod crc;
 mod input;
+mod localization;
 mod motor;
 mod odometer;
 mod preferences;

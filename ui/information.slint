@@ -5,7 +5,6 @@ import { UiText } from "text.slint";
 import "../assets/NotoSans-Regular.ttf";
 
 export component InformationPage inherits PageFrame {
-    in property <bool> russian;
     in property <bool> show-diagnostics;
     in property <MenuItem> item: MenuItem.battery-info;
     in property <InformationData> data: {
@@ -13,7 +12,7 @@ export component InformationPage inherits PageFrame {
         battery: { kind: ValueKind.percent, whole: 78, available: true },
     };
     in property <DiagnosticsData> diagnostics;
-    title: MenuText.label(root.show-diagnostics ? MenuItem.diagnostics : root.item, root.russian);
-    private property <string> body: root.show-diagnostics ? UiText.diagnostics(root.diagnostics, root.russian) : UiText.information(root.item, root.data, root.russian);
+    title: MenuText.label(root.show-diagnostics ? MenuItem.diagnostics : root.item);
+    private property <string> body: root.show-diagnostics ? UiText.diagnostics(root.diagnostics) : UiText.information(root.item, root.data);
     Text { x: 10px; y: 38px; width: 300px; height: 178px; text: root.body; color: white; font-size: 14px; wrap: word-wrap; }
 }

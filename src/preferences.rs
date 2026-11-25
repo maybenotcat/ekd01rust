@@ -1,6 +1,10 @@
 use crate::{crc::crc32, soc::DebugUart, storage::SettingsStore};
 use littlefs_rust::Error;
 
+const RECORD_VERSION: u32 = 6;
+const LANGUAGE_SHIFT: u32 = 16;
+const LANGUAGE_MASK: u32 = 0xff << LANGUAGE_SHIFT;
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[repr(u8)]
 pub enum DashboardTheme {
@@ -85,11 +89,12 @@ impl Record {
         let mut record = Self { bytes: [0; 92] };
         record.bytes[..bytes.len()].copy_from_slice(bytes);
         let version = record.word(4);
-        if bytes.len() != if version == 5 { 92 } else { 88 } {
+        if bytes.len() != if version >= 5 { 92 } else { 88 } {
             return None;
         }
         let flags = record.word(24);
-        let mask = (if version >= 4 { 1 << 12 } else { 0 })
+        let mask = (if version >= 6 { LANGUAGE_MASK } else { 0 })
+            | (if version >= 4 { 1 << 12 } else { 0 })
             | 255
             | if version >= 2 { 1 << 8 } else { 0 }
             | if version >= 3 {
@@ -98,7 +103,7 @@ impl Record {
                 0
             };
         if record.word(0) != 0x46504b45
-            || !(1..=5).contains(&version)
+            || !(1..=RECORD_VERSION).contains(&version)
             || !(1..=5).contains(&record.word(12))
             || record.word(16) > 1
             || !matches!(record.word(20), 3 | 5 | 9)
@@ -136,7 +141,11 @@ impl Record {
             } else {
                 DashboardTheme::Standard
             };
-            out.settings.language = ((flags >> 9) & 1) as u8;
+            out.settings.language = if version >= 6 {
+                ((flags & LANGUAGE_MASK) >> LANGUAGE_SHIFT) as u8
+            } else {
+                ((flags >> 9) & 1) as u8
+            };
             out.settings.power_mode = ((flags >> 10) & 3) as u8;
             out.settings.service_interval_km = self.word(32);
             out.since_service_m = self.word(36);
@@ -155,12 +164,14 @@ impl Record {
         let settings = &preferences.settings;
         let flags = settings.auto_off_minutes as u32
             | ((settings.bluetooth as u32) << 8)
-            | ((settings.language as u32) << 9)
+            // Keep the legacy Russian bit separate from the full locale ID.
+            | (((settings.language == 1) as u32) << 9)
+            | ((settings.language as u32) << LANGUAGE_SHIFT)
             | ((settings.power_mode as u32) << 10)
             | ((settings.theme as u32) << 12);
         for (offset, value) in [
             (0, 0x46504b45),
-            (4, 5),
+            (4, RECORD_VERSION),
             (8, sequence),
             (12, settings.brightness as u32),
             (16, settings.imperial as u32),
@@ -229,7 +240,7 @@ impl SettingsManager {
                         .as_ref()
                         .is_none_or(|old| Self::newer(record.word(8), old.word(8)))
                     {
-                        self.last_current = record.word(4) == 5;
+                        self.last_current = record.word(4) == RECORD_VERSION;
                         newest = Some(record);
                         self.slot = slot;
                         self.file_source = true;

@@ -19,7 +19,6 @@ export component Dashboard inherits Window {
     default-font-family: "Noto Sans";
     in property <Screen> view: Screen.dashboard;
     in property <int> theme: 0;
-    in property <bool> russian;
     in property <bool> imperial;
     in property <string> build-id: "0123456789abcdef";
     in property <string> git-commit: "7adae99";
@@ -44,18 +43,18 @@ export component Dashboard inherits Window {
     in property <StatusCode> status-code: StatusCode.none;
     in property <bool> status-error;
 
-    private property <string> status: root.status-code == StatusCode.page-position ? "\{root.menu-selected + 1} / \{root.menu-items.length}" : UiText.status(root.status-code, root.russian);
-    private property <string> error: UiText.dashboard-error(root.dashboard-data.fault, root.dashboard-data.error-code, root.dashboard-data.service-due, root.russian);
+    private property <string> status: root.status-code == StatusCode.page-position ? "\{root.menu-selected + 1} / \{root.menu-items.length}" : UiText.status(root.status-code);
+    private property <string> error: UiText.dashboard-error(root.dashboard-data.fault, root.dashboard-data.error-code, root.dashboard-data.service-due);
     private property <string> speed-integer: root.dashboard-data.speed-available ? "\{floor(root.dashboard-data.speed-tenths / 10)}" : "--";
     private property <string> speed-fraction: root.dashboard-data.speed-available ? ".\{mod(root.dashboard-data.speed-tenths, 10)}" : ".-";
-    private property <string> speed-unit: UiText.speed-unit(root.russian, root.imperial);
-    private property <string> power: UiText.value(root.dashboard-data.power, root.russian, root.imperial);
+    private property <string> speed-unit: UiText.speed-unit(root.imperial);
+    private property <string> power: UiText.value(root.dashboard-data.power, root.imperial);
     private property <int> power-fill: root.dashboard-data.power.available ? min(floor(max(root.dashboard-data.power.whole, 0) / 20), 100) : 0;
-    private property <string> voltage: UiText.value(root.dashboard-data.voltage, root.russian, root.imperial);
-    private property <string> battery-text: UiText.value(root.dashboard-data.battery, root.russian, root.imperial);
+    private property <string> voltage: UiText.value(root.dashboard-data.voltage, root.imperial);
+    private property <string> battery-text: UiText.value(root.dashboard-data.battery, root.imperial);
     private property <int> battery: root.dashboard-data.battery.available ? root.dashboard-data.battery.whole : 0;
-    private property <string> trip: UiText.value(root.dashboard-data.trip, root.russian, root.imperial);
-    private property <string> odometer: UiText.value(root.dashboard-data.odometer, root.russian, root.imperial);
+    private property <string> trip: UiText.value(root.dashboard-data.trip, root.imperial);
+    private property <string> odometer: UiText.value(root.dashboard-data.odometer, root.imperial);
 
     if root.view == Screen.dashboard && root.theme == 0: StandardDashboard {
         width: 320px; height: 240px;
@@ -64,9 +63,8 @@ export component Dashboard inherits Window {
         compact-speed: root.dashboard-data.speed-available && root.dashboard-data.speed-tenths >= 1000;
         speed-unit: root.speed-unit; power: root.power; power-fill: root.power-fill;
         voltage: root.voltage; battery: root.battery; battery-text: root.battery-text;
-        assist-level: root.dashboard-data.assist; trip-text: root.trip; trip-caption: UiText.caption(StatisticKind.trip, root.russian);
+        assist-level: root.dashboard-data.assist; trip-text: root.trip; trip-caption: UiText.caption(StatisticKind.trip);
         odometer-text: root.odometer; lights: root.dashboard-data.lights; bluetooth: root.dashboard-data.bluetooth;
-        russian: root.russian;
         status: root.status; status-error: root.status-error; error: root.error; fault: root.dashboard-data.fault;
     }
     if root.view == Screen.dashboard && root.theme == 1: ClassicDashboard {
@@ -78,26 +76,25 @@ export component Dashboard inherits Window {
         power: root.power; battery: root.battery; battery-text: root.battery-text;
         voltage: root.voltage; assist: root.dashboard-data.assist; trip: root.trip; odometer: root.odometer;
         lights: root.dashboard-data.lights; bluetooth: root.dashboard-data.bluetooth; error: root.error; fault: root.dashboard-data.fault;
-        russian: root.russian;
         status: root.status; status-error: root.status-error;
     }
     if root.view == Screen.menu: SettingsPage {
         page: root.menu-page; items: root.menu-items; selected: root.menu-selected;
-        russian: root.russian; imperial: root.imperial;
+        imperial: root.imperial;
         status: root.status; status-error: root.status-error;
     }
     if root.view == Screen.ride: RidePage {
-        statistics: root.statistics; russian: root.russian; imperial: root.imperial;
+        statistics: root.statistics; imperial: root.imperial;
         status: root.status; status-error: root.status-error;
     }
     if root.view == Screen.information && root.information-item == MenuItem.about: AboutPage {
-        russian: root.russian; build-id: root.build-id;
+        build-id: root.build-id;
         git-commit: root.git-commit; git-modified: root.git-modified;
         status: root.status; status-error: root.status-error;
     }
     if (root.view == Screen.information && root.information-item != MenuItem.about) || root.view == Screen.diagnostics: InformationPage {
         item: root.information-item; data: root.information-data;
         diagnostics: root.diagnostics-data; show-diagnostics: root.view == Screen.diagnostics;
-        russian: root.russian; status: root.status; status-error: root.status-error;
+        status: root.status; status-error: root.status-error;
     }
 }

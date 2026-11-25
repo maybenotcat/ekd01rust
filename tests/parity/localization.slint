@@ -1,0 +1,23 @@
+import { UiText } from "../../ui/text.slint";
+import { MenuText } from "../../ui/menu-labels.slint";
+import { MenuItem, StatusCode, DisplayValue, ValueKind, StatisticKind, MenuPage } from "../../ui/types.slint";
+export { MenuItem, StatusCode, DisplayValue, ValueKind, StatisticKind, MenuPage } from "../../ui/types.slint";
+
+// Native UI probe: calls the same formatting functions as firmware, with no SoC.
+export component TranslationProbe inherits Window {
+    in property <MenuItem> item: MenuItem.about;
+    in property <StatusCode> status: StatusCode.settings-save-failed;
+    in property <DisplayValue> value: { kind: ValueKind.power, whole: 742, available: true };
+    out property <string> label: MenuText.label(root.item);
+    out property <string> message: UiText.status(root.status);
+    out property <string> formatted-value: UiText.value(root.value, false);
+    out property <string> metric-unit: UiText.speed-unit(false);
+    // Ensure all formatter paths and menu titles are included in the test bundle.
+    out property <string> caption: UiText.caption(StatisticKind.trip);
+    out property <string> menu-title: MenuText.title(MenuPage.root);
+    out property <string> build-label: @tr("Build ID");
+    out property <string> commit-label: @tr("Commit");
+    out property <string> unknown-label: @tr("Unknown");
+    out property <string> modified-label: @tr("+ modified");
+    out property <string> language-name: @tr("English");
+}

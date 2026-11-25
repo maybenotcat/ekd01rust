@@ -253,7 +253,10 @@ impl UiModel {
                 settings.bluetooth = !settings.bluetooth;
                 actions |= Actions::BLUETOOTH;
             }
-            Language => settings.language ^= 1,
+            Language => {
+                settings.language =
+                    crate::localization::Language::next(settings.language, direction)
+            }
             Theme => settings.theme.toggle(),
             PowerMode => {
                 settings.power_mode =

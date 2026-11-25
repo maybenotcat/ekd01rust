@@ -22,6 +22,8 @@ fn source_files(directory: &Path, files: &mut Vec<PathBuf>) {
                     | "svg"
                     | "bin"
                     | "cfg"
+                    | "po"
+                    | "pot"
             )
         ) {
             files.push(path);

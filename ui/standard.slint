@@ -6,7 +6,6 @@ import "../assets/EKD01Speed.ttf";
 export component StandardDashboard inherits Rectangle {
     width: 320px;
     height: 240px;
-    in property <bool> russian;
     // Preview defaults are replaced by app.slint bindings on the device.
     in property <string> speed-integer: "25";
     in property <string> speed-fraction: ".3";
@@ -71,7 +70,7 @@ export component StandardDashboard inherits Rectangle {
         Text { width: parent.width; height: parent.height; text: root.assist-level; color: white; font-size: 28px; horizontal-alignment: center; vertical-alignment: center; }
     }
     Rectangle { x: 201px; y: 188px; width: 1px; height: 40px; background: #28dce2; }
-    Text { x: 208px; y: 185px; width: 101px; height: 19px; text: UiText.odometer-caption(root.russian); color: white; font-size: 14px; horizontal-alignment: center; }
+    Text { x: 208px; y: 185px; width: 101px; height: 19px; text: UiText.odometer-caption(); color: white; font-size: 14px; horizontal-alignment: center; }
     Text { x: 208px; y: 205px; width: 101px; height: 29px; text: root.odometer-text; color: white; font-size: 20px; horizontal-alignment: center; vertical-alignment: center; }
 
     // Faults and operation results overlay the dashboard only when present.

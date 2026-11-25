@@ -13,6 +13,16 @@ bitflags = "2"
 critical-section = { version = "1.2", features = ["std"] }
 littlefs_rust = { package = "littlefs2-rust", path = "../../third_party/littlefs_rust", default-features = false }
 
+[dev-dependencies]
+rspolib = "=0.1.2"
+slint = { version = "=1.15.1", default-features = false, features = ["compat-1-2", "std", "renderer-software"] }
+
+[build-dependencies]
+slint-build = "=1.15.1"
+
+[patch.crates-io]
+i-slint-compiler = { path = "../../third_party/slint-compiler" }
+
 [lib]
 path = "lib.rs"
 

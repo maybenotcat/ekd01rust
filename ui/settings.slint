@@ -19,7 +19,6 @@ component SettingRow inherits Rectangle {
 export component SettingsPage inherits PageFrame {
     // Standalone preview; runtime supplies the complete page and selection.
     in property <MenuPage> page: MenuPage.display;
-    in property <bool> russian;
     in property <bool> imperial;
     in property <[MenuEntry]> items: [
         { kind: MenuItem.units, value: { kind: ValueKind.distance-unit } },
@@ -36,13 +35,13 @@ export component SettingsPage inherits PageFrame {
     in property <int> selected: 2;
     private property <int> rows-per-page: 5;
     private property <int> first-visible: floor(root.selected / root.rows-per-page) * root.rows-per-page;
-    title: MenuText.title(root.page, root.russian);
+    title: MenuText.title(root.page);
     for entry[index] in root.items: SettingRow {
         visible: index >= root.first-visible && index < root.first-visible + root.rows-per-page;
         x: 8px;
         y: 36px + (index - root.first-visible) * 36px;
-        label: MenuText.label(entry.kind, root.russian);
-        value: UiText.value(entry.value, root.russian, root.imperial);
+        label: MenuText.label(entry.kind);
+        value: entry.kind == MenuItem.language ? @tr("English") : UiText.value(entry.value, root.imperial);
         selected: index == root.selected;
     }
 }

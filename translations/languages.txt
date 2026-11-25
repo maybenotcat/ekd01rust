@@ -1,0 +1,5 @@
+# Permanent storage ID | locale code | native display name
+# Never renumber existing IDs. The order controls the settings selector.
+0 | en | English
+1 | ru | Русский
+2 | es | Español

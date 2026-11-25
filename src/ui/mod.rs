@@ -63,6 +63,7 @@ pub struct UserInterface {
     statistics: Rc<slint::VecModel<Statistic>>,
     menu_items: Rc<slint::VecModel<MenuEntry>>,
     first_frame: bool,
+    language: core::cell::Cell<Option<u8>>,
 }
 impl UserInterface {
     pub fn new(display: Display) -> Result<Self, PlatformError> {
@@ -90,7 +91,19 @@ impl UserInterface {
             statistics,
             menu_items,
             first_frame: true,
+            language: core::cell::Cell::new(None),
         })
+    }
+    pub fn set_language(&self, id: u8) {
+        let language = crate::localization::Language::from_id(id);
+        if self.language.get() == Some(language.id) {
+            return;
+        }
+        if slint::select_bundled_translation(language.code).is_err() {
+            crate::soc::DebugUart::log("[UI] LANGUAGE_UNAVAILABLE; using English\n");
+            let _ = slint::select_bundled_translation("en");
+        }
+        self.language.set(Some(language.id));
     }
     pub async fn render(&mut self) -> Result<bool, DisplayError> {
         if self.first_frame {

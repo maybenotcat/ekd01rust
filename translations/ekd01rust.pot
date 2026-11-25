@@ -1,0 +1,515 @@
+# EKD01 firmware UI translation template.
+msgid ""
+msgstr ""
+"Project-Id-Version: ekd01rust\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: ui/classic.slint:42 ui/text.slint:74
+msgid " W"
+msgstr ""
+
+#: ui/text.slint:87
+msgid " levels"
+msgstr ""
+
+#: ui/text.slint:89
+msgid " min"
+msgstr ""
+
+#: ui/text.slint:77
+msgid " rpm"
+msgstr ""
+
+#: ui/about.slint:15
+msgid "+ modified"
+msgstr ""
+
+#: ui/menu-labels.slint:163
+msgid "ADVANCED MOTOR"
+msgstr ""
+
+#: ui/menu-labels.slint:6
+msgid "About"
+msgstr ""
+
+#: ui/menu-labels.slint:114
+msgid "Advanced"
+msgstr ""
+
+#: ui/text.slint:103
+msgid "Apply"
+msgstr ""
+
+#: ui/menu-labels.slint:98
+msgid "Auto Power Off"
+msgstr ""
+
+#: ui/text.slint:36
+msgid "BATTERY"
+msgstr ""
+
+#: ui/menu-labels.slint:90
+msgid "Back"
+msgstr ""
+
+#: ui/text.slint:121
+msgid "Bad block"
+msgstr ""
+
+#: ui/text.slint:169
+msgid "Bad frames  "
+msgstr ""
+
+#: ui/menu-labels.slint:119
+msgid "Battery Info"
+msgstr ""
+
+#: ui/menu-labels.slint:91
+msgid "Bluetooth"
+msgstr ""
+
+#: ui/menu-labels.slint:110
+msgid "Boost Gear"
+msgstr ""
+
+#: ui/menu-labels.slint:96
+msgid "Brightness"
+msgstr ""
+
+#: ui/about.slint:11
+msgid "Build ID"
+msgstr ""
+
+#: ui/text.slint:104
+msgid "Busy"
+msgstr ""
+
+#: ui/text.slint:35
+msgid "CADENCE"
+msgstr ""
+
+#: ui/text.slint:105
+msgid "CAN offline"
+msgstr ""
+
+#: ui/text.slint:38
+msgid "CONTROLLER"
+msgstr ""
+
+#: ui/menu-labels.slint:164
+msgid "CURRENT PER LEVEL"
+msgstr ""
+
+#: ui/text.slint:84
+msgid "Classic"
+msgstr ""
+
+#: ui/menu-labels.slint:125
+msgid "Clear errors"
+msgstr ""
+
+#: ui/menu-labels.slint:100
+msgid "Clock / hour"
+msgstr ""
+
+#: ui/menu-labels.slint:101
+msgid "Clock / minute"
+msgstr ""
+
+#: ui/about.slint:13
+msgid "Commit"
+msgstr ""
+
+#: ui/menu-labels.slint:120
+msgid "Ctrl Info"
+msgstr ""
+
+#: ui/menu-labels.slint:130
+msgid "Current limits"
+msgstr ""
+
+#: ui/menu-labels.slint:160
+msgid "DISPLAY SETTING"
+msgstr ""
+
+#: ui/menu-labels.slint:124
+msgid "Diagnostics"
+msgstr ""
+
+#: ui/menu-labels.slint:121
+msgid "Display Info"
+msgstr ""
+
+#: ui/menu-labels.slint:85
+msgid "Display Setting"
+msgstr ""
+
+#: ui/text.slint:126
+msgid "EDIT"
+msgstr ""
+
+#: ui/settings.slint
+msgid "English"
+msgstr ""
+
+#: ui/text.slint:133
+msgid "ERROR "
+msgstr ""
+
+#: ui/text.slint:160
+msgid "Error "
+msgstr ""
+
+#: ui/menu-labels.slint:123
+msgid "Error code"
+msgstr ""
+
+#: ui/menu-labels.slint:89
+msgid "Exit"
+msgstr ""
+
+#: ui/menu-labels.slint:88
+msgid "Factory Reset"
+msgstr ""
+
+#: ui/menu-labels.slint:103
+msgid "Home screen"
+msgstr ""
+
+#: ui/menu-labels.slint:162
+msgid "INFORMATION"
+msgstr ""
+
+#: ui/menu-labels.slint:87
+msgid "Information"
+msgstr ""
+
+#: ui/menu-labels.slint:102
+msgid "Language"
+msgstr ""
+
+#: ui/text.slint:170
+msgid "Last CAN  "
+msgstr ""
+
+#: ui/menu-labels.slint:138
+msgid "Level 1"
+msgstr ""
+
+#: ui/menu-labels.slint:139
+msgid "Level 2"
+msgstr ""
+
+#: ui/menu-labels.slint:140
+msgid "Level 3"
+msgstr ""
+
+#: ui/menu-labels.slint:141
+msgid "Level 4"
+msgstr ""
+
+#: ui/menu-labels.slint:142
+msgid "Level 5"
+msgstr ""
+
+#: ui/menu-labels.slint:143
+msgid "Level 6"
+msgstr ""
+
+#: ui/menu-labels.slint:144
+msgid "Level 7"
+msgstr ""
+
+#: ui/menu-labels.slint:145
+msgid "Level 8"
+msgstr ""
+
+#: ui/menu-labels.slint:146
+msgid "Level 9"
+msgstr ""
+
+#: ui/menu-labels.slint:105
+msgid "Light sensitivity"
+msgstr ""
+
+#: ui/text.slint:114
+msgid "Loaded"
+msgstr ""
+
+#: ui/menu-labels.slint:161
+msgid "MOTOR SETTINGS"
+msgstr ""
+
+#: ui/text.slint:37
+msgid "MOTOR"
+msgstr ""
+
+#: ui/text.slint:122
+msgid "Mismatch"
+msgstr ""
+
+#: ui/text.slint:88
+msgid "Mode "
+msgstr ""
+
+#: ui/text.slint:117
+msgid "Modified"
+msgstr ""
+
+#: ui/menu-labels.slint:86
+msgid "Motor Settings"
+msgstr ""
+
+#: ui/text.slint:159
+msgid "No recorded errors"
+msgstr ""
+
+#: ui/text.slint:115
+msgid "No reply"
+msgstr ""
+
+#: ui/text.slint:146
+msgid "No torque sensor data\nSerial / version  --"
+msgstr ""
+
+#: ui/text.slint:83
+msgid "No"
+msgstr ""
+
+#: ui/text.slint:41
+msgid "ODO"
+msgstr ""
+
+#: ui/menu-labels.slint:154
+msgid "Odometer"
+msgstr ""
+
+#: ui/text.slint:82 ui/text.slint:89
+msgid "Off"
+msgstr ""
+
+#: ui/text.slint:82
+msgid "On"
+msgstr ""
+
+#: ui/text.slint:129
+msgid "Power control error"
+msgstr ""
+
+#: ui/menu-labels.slint:133
+msgid "Power mode"
+msgstr ""
+
+#: ui/text.slint:127
+msgid "Powering off"
+msgstr ""
+
+#: ui/text.slint:108
+msgid "Queued"
+msgstr ""
+
+#: ui/text.slint:34
+msgid "RANGE"
+msgstr ""
+
+#: ui/text.slint:44
+msgid "RIDE STATISTICS"
+msgstr ""
+
+#: ui/text.slint:116
+msgid "Read first"
+msgstr ""
+
+#: ui/text.slint:164
+msgid "Read only"
+msgstr ""
+
+#: ui/text.slint:110
+msgid "Readback OK"
+msgstr ""
+
+#: ui/text.slint:113
+msgid "Reading"
+msgstr ""
+
+#: ui/text.slint:130
+msgid "SERVICE DUE"
+msgstr ""
+
+#: ui/menu-labels.slint:167
+msgid "SERVICE"
+msgstr ""
+
+#: ui/menu-labels.slint:159
+msgid "SETTINGS"
+msgstr ""
+
+#: ui/menu-labels.slint:165
+msgid "SPEED PER LEVEL"
+msgstr ""
+
+#: ui/menu-labels.slint:166
+msgid "START RESPONSE"
+msgstr ""
+
+#: ui/text.slint:125
+msgid "Save error"
+msgstr ""
+
+#: ui/text.slint:109
+msgid "Sent"
+msgstr ""
+
+#: ui/text.slint:156
+msgid "Serial / version"
+msgstr ""
+
+#: ui/menu-labels.slint:151
+msgid "Service interval"
+msgstr ""
+
+#: ui/menu-labels.slint:152
+msgid "Service reset"
+msgstr ""
+
+#: ui/menu-labels.slint:104
+msgid "Service"
+msgstr ""
+
+#: ui/text.slint:106
+msgid "Set assist 0"
+msgstr ""
+
+#: ui/text.slint:107
+msgid "Set values"
+msgstr ""
+
+#: ui/text.slint:128
+msgid "Settings save failed"
+msgstr ""
+
+#: ui/menu-labels.slint:153
+msgid "Since service"
+msgstr ""
+
+#: ui/text.slint:161
+msgid "Source "
+msgstr ""
+
+#: ui/menu-labels.slint:111
+msgid "Speed Limit"
+msgstr ""
+
+#: ui/menu-labels.slint:131
+msgid "Speed limits"
+msgstr ""
+
+#: ui/text.slint:84
+msgid "Standard"
+msgstr ""
+
+#: ui/menu-labels.slint:132
+msgid "Start response"
+msgstr ""
+
+#: ui/menu-labels.slint:99
+msgid "TRIP Reset"
+msgstr ""
+
+#: ui/text.slint:33
+msgid "TRIP"
+msgstr ""
+
+#: ui/menu-labels.slint:122
+msgid "Torque Info"
+msgstr ""
+
+#: ui/text.slint:139
+msgid "Total voltage"
+msgstr ""
+
+#: ui/text.slint:168
+msgid "UART errors  "
+msgstr ""
+
+#: ui/text.slint:149
+msgid "Unavailable"
+msgstr ""
+
+#: ui/menu-labels.slint:97
+msgid "Unit"
+msgstr ""
+
+#: ui/about.slint:14
+msgid "Unknown"
+msgstr ""
+
+#: ui/text.slint:62
+msgid "V"
+msgstr ""
+
+#: ui/text.slint:120
+msgid "Verified"
+msgstr ""
+
+#: ui/text.slint:119
+msgid "Verifying"
+msgstr ""
+
+#: ui/classic.slint:57
+msgid "W"
+msgstr ""
+
+#: ui/text.slint:152
+msgid "Waiting for controller data"
+msgstr ""
+
+#: ui/menu-labels.slint:113
+msgid "Wheel Length"
+msgstr ""
+
+#: ui/menu-labels.slint:112
+msgid "Wheel Size"
+msgstr ""
+
+#: ui/text.slint:118
+msgid "Writing"
+msgstr ""
+
+#: ui/text.slint:83
+msgid "Yes"
+msgstr ""
+
+#: ui/text.slint:167
+msgid "fresh"
+msgstr ""
+
+#: ui/text.slint:68 ui/text.slint:154
+msgid "in"
+msgstr ""
+
+#: ui/text.slint:27
+msgid "km"
+msgstr ""
+
+#: ui/text.slint:30
+msgid "km/h"
+msgstr ""
+
+#: ui/text.slint:27
+msgid "mi"
+msgstr ""
+
+#: ui/text.slint:75 ui/text.slint:155
+msgid "mm"
+msgstr ""
+
+#: ui/text.slint:30
+msgid "mph"
+msgstr ""
+
+#: ui/text.slint:167
+msgid "stale"
+msgstr ""
+

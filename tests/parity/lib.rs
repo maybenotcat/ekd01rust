@@ -1,5 +1,13 @@
 //! Native source-level checks. The NOR backend is substituted; no CPU is emulated.
 extern crate alloc;
+#[cfg(test)]
+mod catalogs;
+#[cfg(test)]
+#[allow(dead_code)]
+#[path = "../../build-support/localization.rs"]
+mod locale_registry;
+#[path = "../../src/localization.rs"]
+pub mod localization;
 
 #[cfg(test)]
 #[allow(dead_code)]

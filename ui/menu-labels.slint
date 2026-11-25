@@ -2,8 +2,8 @@ import { MenuItem, MenuPage } from "types.slint";
 
 export global MenuText {
     // Group labels by settings domain instead of one deeply nested chain.
-    public pure function label(item: MenuItem, russian: bool) -> string {
-        if (item == MenuItem.about) { return russian ? "О программе" : "About"; }
+    public pure function label(item: MenuItem) -> string {
+        if (item == MenuItem.about) { return @tr("About"); }
         if (
             item == MenuItem.display ||
             item == MenuItem.motor ||
@@ -13,7 +13,7 @@ export global MenuText {
             item == MenuItem.back ||
             item == MenuItem.bluetooth
         ) {
-            return root.navigation-label(item, russian);
+            return root.navigation-label(item);
         }
         if (
             item == MenuItem.brightness ||
@@ -27,7 +27,7 @@ export global MenuText {
             item == MenuItem.service ||
             item == MenuItem.sensitivity
         ) {
-            return root.display-label(item, russian);
+            return root.display-label(item);
         }
         if (
             item == MenuItem.levels ||
@@ -36,7 +36,7 @@ export global MenuText {
             item == MenuItem.circumference ||
             item == MenuItem.advanced
         ) {
-            return root.motor-label(item, russian);
+            return root.motor-label(item);
         }
         if (
             item == MenuItem.battery-info ||
@@ -47,7 +47,7 @@ export global MenuText {
             item == MenuItem.diagnostics ||
             item == MenuItem.error-clear
         ) {
-            return root.information-label(item, russian);
+            return root.information-label(item);
         }
         if (
             item == MenuItem.current ||
@@ -55,7 +55,7 @@ export global MenuText {
             item == MenuItem.start ||
             item == MenuItem.power-mode
         ) {
-            return root.advanced-label(item, russian);
+            return root.advanced-label(item);
         }
         if (
             item == MenuItem.level1 ||
@@ -68,7 +68,7 @@ export global MenuText {
             item == MenuItem.level8 ||
             item == MenuItem.level9
         ) {
-            return root.levels-label(item, russian);
+            return root.levels-label(item);
         }
         if (
             item == MenuItem.service-interval ||
@@ -76,95 +76,95 @@ export global MenuText {
             item == MenuItem.service-distance ||
             item == MenuItem.odometer
         ) {
-            return root.service-label(item, russian);
+            return root.service-label(item);
         }
         return "";
     }
 
-    pure function navigation-label(item: MenuItem, russian: bool) -> string {
-        if (item == MenuItem.display) { return russian ? "Экран" : "Display Setting"; }
-        if (item == MenuItem.motor) { return russian ? "Двигатель" : "Motor Settings"; }
-        if (item == MenuItem.information) { return russian ? "Информация" : "Information"; }
-        if (item == MenuItem.factory-reset) { return russian ? "Сброс настроек" : "Factory Reset"; }
-        if (item == MenuItem.exit) { return russian ? "Выход" : "Exit"; }
-        if (item == MenuItem.back) { return russian ? "Назад" : "Back"; }
-        if (item == MenuItem.bluetooth) { return "Bluetooth"; }
+    pure function navigation-label(item: MenuItem) -> string {
+        if (item == MenuItem.display) { return @tr("Display Setting"); }
+        if (item == MenuItem.motor) { return @tr("Motor Settings"); }
+        if (item == MenuItem.information) { return @tr("Information"); }
+        if (item == MenuItem.factory-reset) { return @tr("Factory Reset"); }
+        if (item == MenuItem.exit) { return @tr("Exit"); }
+        if (item == MenuItem.back) { return @tr("Back"); }
+        if (item == MenuItem.bluetooth) { return @tr("Bluetooth"); }
         return "";
     }
 
-    pure function display-label(item: MenuItem, russian: bool) -> string {
-        if (item == MenuItem.brightness) { return russian ? "Яркость" : "Brightness"; }
-        if (item == MenuItem.units) { return russian ? "Единицы" : "Unit"; }
-        if (item == MenuItem.auto-off) { return russian ? "Автовыключение" : "Auto Power Off"; }
-        if (item == MenuItem.trip) { return russian ? "Сброс поездки" : "TRIP Reset"; }
-        if (item == MenuItem.hour) { return russian ? "Часы" : "Clock / hour"; }
-        if (item == MenuItem.minute) { return russian ? "Минуты" : "Clock / minute"; }
-        if (item == MenuItem.language) { return russian ? "Язык" : "Language"; }
-        if (item == MenuItem.theme) { return russian ? "Главный экран" : "Home screen"; }
-        if (item == MenuItem.service) { return russian ? "Обслуживание" : "Service"; }
-        if (item == MenuItem.sensitivity) { return "Light sensitivity"; }
+    pure function display-label(item: MenuItem) -> string {
+        if (item == MenuItem.brightness) { return @tr("Brightness"); }
+        if (item == MenuItem.units) { return @tr("Unit"); }
+        if (item == MenuItem.auto-off) { return @tr("Auto Power Off"); }
+        if (item == MenuItem.trip) { return @tr("TRIP Reset"); }
+        if (item == MenuItem.hour) { return @tr("Clock / hour"); }
+        if (item == MenuItem.minute) { return @tr("Clock / minute"); }
+        if (item == MenuItem.language) { return @tr("Language"); }
+        if (item == MenuItem.theme) { return @tr("Home screen"); }
+        if (item == MenuItem.service) { return @tr("Service"); }
+        if (item == MenuItem.sensitivity) { return @tr("Light sensitivity"); }
         return "";
     }
 
-    pure function motor-label(item: MenuItem, russian: bool) -> string {
-        if (item == MenuItem.levels) { return russian ? "Уровни помощи" : "Boost Gear"; }
-        if (item == MenuItem.limit) { return russian ? "Лимит скорости" : "Speed Limit"; }
-        if (item == MenuItem.wheel) { return russian ? "Диаметр колеса" : "Wheel Size"; }
-        if (item == MenuItem.circumference) { return russian ? "Окружность" : "Wheel Length"; }
-        if (item == MenuItem.advanced) { return russian ? "Дополнительно" : "Advanced"; }
+    pure function motor-label(item: MenuItem) -> string {
+        if (item == MenuItem.levels) { return @tr("Boost Gear"); }
+        if (item == MenuItem.limit) { return @tr("Speed Limit"); }
+        if (item == MenuItem.wheel) { return @tr("Wheel Size"); }
+        if (item == MenuItem.circumference) { return @tr("Wheel Length"); }
+        if (item == MenuItem.advanced) { return @tr("Advanced"); }
         return "";
     }
 
-    pure function information-label(item: MenuItem, russian: bool) -> string {
-        if (item == MenuItem.battery-info) { return russian ? "Аккумулятор" : "Battery Info"; }
-        if (item == MenuItem.ctrl-info) { return "Ctrl Info"; }
-        if (item == MenuItem.display-info) { return "Display Info"; }
-        if (item == MenuItem.torque-info) { return "Torque Info"; }
-        if (item == MenuItem.errors) { return russian ? "Журнал ошибок" : "Error code"; }
-        if (item == MenuItem.diagnostics) { return russian ? "ДИАГНОСТИКА" : "Diagnostics"; }
-        if (item == MenuItem.error-clear) { return russian ? "Очистить журнал" : "Clear errors"; }
+    pure function information-label(item: MenuItem) -> string {
+        if (item == MenuItem.battery-info) { return @tr("Battery Info"); }
+        if (item == MenuItem.ctrl-info) { return @tr("Ctrl Info"); }
+        if (item == MenuItem.display-info) { return @tr("Display Info"); }
+        if (item == MenuItem.torque-info) { return @tr("Torque Info"); }
+        if (item == MenuItem.errors) { return @tr("Error code"); }
+        if (item == MenuItem.diagnostics) { return @tr("Diagnostics"); }
+        if (item == MenuItem.error-clear) { return @tr("Clear errors"); }
         return "";
     }
 
-    pure function advanced-label(item: MenuItem, russian: bool) -> string {
-        if (item == MenuItem.current) { return russian ? "Ток по уровням" : "Current limits"; }
-        if (item == MenuItem.speed) { return russian ? "Скорость уровней" : "Speed limits"; }
-        if (item == MenuItem.start) { return russian ? "Реакция старта" : "Start response"; }
-        if (item == MenuItem.power-mode) { return russian ? "Режим мощности" : "Power mode"; }
+    pure function advanced-label(item: MenuItem) -> string {
+        if (item == MenuItem.current) { return @tr("Current limits"); }
+        if (item == MenuItem.speed) { return @tr("Speed limits"); }
+        if (item == MenuItem.start) { return @tr("Start response"); }
+        if (item == MenuItem.power-mode) { return @tr("Power mode"); }
         return "";
     }
 
-    pure function levels-label(item: MenuItem, russian: bool) -> string {
-        if (item == MenuItem.level1) { return russian ? "Уровень 1" : "Level 1"; }
-        if (item == MenuItem.level2) { return russian ? "Уровень 2" : "Level 2"; }
-        if (item == MenuItem.level3) { return russian ? "Уровень 3" : "Level 3"; }
-        if (item == MenuItem.level4) { return russian ? "Уровень 4" : "Level 4"; }
-        if (item == MenuItem.level5) { return russian ? "Уровень 5" : "Level 5"; }
-        if (item == MenuItem.level6) { return russian ? "Уровень 6" : "Level 6"; }
-        if (item == MenuItem.level7) { return russian ? "Уровень 7" : "Level 7"; }
-        if (item == MenuItem.level8) { return russian ? "Уровень 8" : "Level 8"; }
-        if (item == MenuItem.level9) { return russian ? "Уровень 9" : "Level 9"; }
+    pure function levels-label(item: MenuItem) -> string {
+        if (item == MenuItem.level1) { return @tr("Level 1"); }
+        if (item == MenuItem.level2) { return @tr("Level 2"); }
+        if (item == MenuItem.level3) { return @tr("Level 3"); }
+        if (item == MenuItem.level4) { return @tr("Level 4"); }
+        if (item == MenuItem.level5) { return @tr("Level 5"); }
+        if (item == MenuItem.level6) { return @tr("Level 6"); }
+        if (item == MenuItem.level7) { return @tr("Level 7"); }
+        if (item == MenuItem.level8) { return @tr("Level 8"); }
+        if (item == MenuItem.level9) { return @tr("Level 9"); }
         return "";
     }
 
-    pure function service-label(item: MenuItem, russian: bool) -> string {
-        if (item == MenuItem.service-interval) { return russian ? "Интервал ТО" : "Service interval"; }
-        if (item == MenuItem.service-reset) { return russian ? "Обслужено" : "Service reset"; }
-        if (item == MenuItem.service-distance) { return russian ? "После ТО" : "Since service"; }
-        if (item == MenuItem.odometer) { return russian ? "Общий пробег" : "Odometer"; }
+    pure function service-label(item: MenuItem) -> string {
+        if (item == MenuItem.service-interval) { return @tr("Service interval"); }
+        if (item == MenuItem.service-reset) { return @tr("Service reset"); }
+        if (item == MenuItem.service-distance) { return @tr("Since service"); }
+        if (item == MenuItem.odometer) { return @tr("Odometer"); }
         return "";
     }
 
-    public pure function title(page: MenuPage, russian: bool) -> string {
-        if (page == MenuPage.root) { return russian ? "НАСТРОЙКИ" : "SETTINGS"; }
-        if (page == MenuPage.display) { return russian ? "Экран" : "DISPLAY SETTING"; }
-        if (page == MenuPage.motor) { return russian ? "Двигатель" : "MOTOR SETTINGS"; }
-        if (page == MenuPage.information) { return russian ? "Информация" : "INFORMATION"; }
-        if (page == MenuPage.advanced) { return russian ? "ПАРАМЕТРЫ МОТОРА" : "ADVANCED MOTOR"; }
-        if (page == MenuPage.current) { return russian ? "ТОК ПО УРОВНЯМ" : "CURRENT PER LEVEL"; }
-        if (page == MenuPage.speed) { return russian ? "СКОРОСТЬ ПО УРОВНЯМ" : "SPEED PER LEVEL"; }
-        if (page == MenuPage.start) { return russian ? "Реакция старта" : "START RESPONSE"; }
-        if (page == MenuPage.service) { return russian ? "Обслуживание" : "SERVICE"; }
+    public pure function title(page: MenuPage) -> string {
+        if (page == MenuPage.root) { return @tr("SETTINGS"); }
+        if (page == MenuPage.display) { return @tr("DISPLAY SETTING"); }
+        if (page == MenuPage.motor) { return @tr("MOTOR SETTINGS"); }
+        if (page == MenuPage.information) { return @tr("INFORMATION"); }
+        if (page == MenuPage.advanced) { return @tr("ADVANCED MOTOR"); }
+        if (page == MenuPage.current) { return @tr("CURRENT PER LEVEL"); }
+        if (page == MenuPage.speed) { return @tr("SPEED PER LEVEL"); }
+        if (page == MenuPage.start) { return @tr("START RESPONSE"); }
+        if (page == MenuPage.service) { return @tr("SERVICE"); }
         return "";
     }
 }

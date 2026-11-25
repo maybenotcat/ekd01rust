@@ -125,8 +125,7 @@ impl Application {
     }
     fn power_status(&self, code: StatusCode) {
         self.ui
-            .component
-            .set_russian(self.model.preferences.settings.language != 0);
+            .set_language(self.model.preferences.settings.language);
         self.ui.component.set_status_code(code);
     }
     fn actions(&mut self, actions: Actions, now: u32) {

@@ -4,9 +4,8 @@ import { UiText } from "text.slint";
 import "../assets/NotoSans-Regular.ttf";
 
 export component RidePage inherits PageFrame {
-    in property <bool> russian;
     in property <bool> imperial;
-    title: UiText.ride-title(root.russian);
+    title: UiText.ride-title();
     in property <[Statistic]> statistics: [
         { kind: StatisticKind.trip, value: { kind: ValueKind.distance-hundredths, whole: 12, fraction: 34, available: true } },
         { kind: StatisticKind.range, value: { kind: ValueKind.distance-tenths, whole: 65, fraction: 0, available: true } },
@@ -20,7 +19,7 @@ export component RidePage inherits PageFrame {
         y: 36px + floor(index / 2) * 65px;
         width: 148px;
         height: 58px;
-        caption: UiText.caption(entry.kind, root.russian);
-        value: UiText.value(entry.value, root.russian, root.imperial);
+        caption: UiText.caption(entry.kind);
+        value: UiText.value(entry.value, root.imperial);
     }
 }

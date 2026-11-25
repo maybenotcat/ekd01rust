@@ -7,7 +7,6 @@ export component ClassicDashboard inherits Rectangle {
     // application state, overriding these defaults in the firmware.
     width: 320px;
     height: 240px;
-    in property <bool> russian;
     in property <int> speed-tenths: 253;
     in property <bool> speed-available: true;
     in property <int> speed-fill: 34;
@@ -40,7 +39,7 @@ export component ClassicDashboard inherits Rectangle {
     // The scale endpoints match the presenter: 75 km/h and 2000 W.
     Text { x: 64px; y: 6px; width: 57px; height: 19px; text: root.speed-max; color: white; font-size: 18px; horizontal-alignment: center; }
     Text { x: 106px; y: 10px; text: root.speed-unit; color: white; font-size: 12px; }
-    Text { x: 159px; y: 6px; width: 72px; height: 19px; text: "2000 W"; color: white; font-size: 18px; }
+    Text { x: 159px; y: 6px; width: 72px; height: 19px; text: "2000" + @tr(" W"); color: white; font-size: 18px; }
     if root.lights: Image { x: 10px; y: 7px; width: 28px; height: 22px; source: @image-url("../assets/classic/light.svg"); }
     if root.bluetooth != 0: Image { x: 248px; y: 5px; width: 15px; height: 22px; source: @image-url("../assets/bluetooth.svg"); colorize: root.bluetooth == 3 ? #57b894 : root.bluetooth == 2 ? #45d0e8 : #f4a34d; }
 
@@ -55,7 +54,7 @@ export component ClassicDashboard inherits Rectangle {
     Text { x: 0px; y: 69px; width: 32px; height: 20px; text: root.speed-mid; color: white; font-size: 18px; horizontal-alignment: right; }
     Text { x: 0px; y: 89px; width: 32px; text: root.speed-unit; color: white; font-size: 12px; horizontal-alignment: right; }
     Text { x: 236px; y: 74px; width: 38px; text: "1000"; color: white; font-size: 12px; }
-    Text { x: 237px; y: 90px; text: "W"; color: white; font-size: 12px; }
+    Text { x: 237px; y: 90px; text: @tr("W"); color: white; font-size: 12px; }
     Text { x: 124px; y: 160px; text: "0"; color: white; font-size: 14px; }
     // The power scale ends at x = 153 + 78 in right-scale.svg.
     Text { x: 221px; y: 153px; width: 20px; height: 20px; text: "0"; color: white; font-size: 14px; horizontal-alignment: center; }
@@ -88,8 +87,8 @@ export component ClassicDashboard inherits Rectangle {
         }
     }
 
-    Text { x: 8px; y: 194px; width: 98px; height: 18px; text: UiText.caption(StatisticKind.trip, root.russian); color: #ff6255; font-size: 14px; horizontal-alignment: center; }
-    Text { x: 158px; y: 194px; width: 89px; height: 18px; text: UiText.odometer-caption(root.russian); color: #ff6255; font-size: 14px; horizontal-alignment: center; }
+    Text { x: 8px; y: 194px; width: 98px; height: 18px; text: UiText.caption(StatisticKind.trip); color: #ff6255; font-size: 14px; horizontal-alignment: center; }
+    Text { x: 158px; y: 194px; width: 89px; height: 18px; text: UiText.odometer-caption(); color: #ff6255; font-size: 14px; horizontal-alignment: center; }
     Rectangle { x: 5px; y: 212px; width: 103px; height: 2px; background: white; }
     Rectangle { x: 154px; y: 212px; width: 91px; height: 2px; background: white; }
     Rectangle { x: 252px; y: 212px; width: 65px; height: 2px; background: white; }

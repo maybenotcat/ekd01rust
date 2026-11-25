@@ -1,0 +1,390 @@
+# Spanish UI translations.
+msgid ""
+msgstr ""
+"Project-Id-Version: ekd01rust\n"
+"Language: es\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid " W"
+msgstr " W"
+
+msgid " levels"
+msgstr " niveles"
+
+msgid " min"
+msgstr " min"
+
+msgid " rpm"
+msgstr " rpm"
+
+msgid "+ modified"
+msgstr "+ modificada"
+
+msgid "ADVANCED MOTOR"
+msgstr "MOTOR AVANZADO"
+
+msgid "About"
+msgstr "Acerca de"
+
+msgid "Advanced"
+msgstr "Avanzado"
+
+msgid "Apply"
+msgstr "Aplicar"
+
+msgid "Auto Power Off"
+msgstr "Apagado automático"
+
+msgid "BATTERY"
+msgstr "BATERÍA"
+
+msgid "Back"
+msgstr "Volver"
+
+msgid "Bad block"
+msgstr "Bloque incorrecto"
+
+msgid "Bad frames  "
+msgstr "Tramas erróneas  "
+
+msgid "Battery Info"
+msgstr "Batería"
+
+msgid "Bluetooth"
+msgstr "Bluetooth"
+
+msgid "Boost Gear"
+msgstr "Niveles de asistencia"
+
+msgid "Brightness"
+msgstr "Brillo"
+
+msgid "Build ID"
+msgstr "ID de compilación"
+
+msgid "Busy"
+msgstr "Ocupado"
+
+msgid "CADENCE"
+msgstr "CADENCIA"
+
+msgid "CAN offline"
+msgstr "Sin conexión CAN"
+
+msgid "CONTROLLER"
+msgstr "CONTROLADOR"
+
+msgid "CURRENT PER LEVEL"
+msgstr "CORRIENTE POR NIVEL"
+
+msgid "Classic"
+msgstr "Clásica"
+
+msgid "Clear errors"
+msgstr "Borrar errores"
+
+msgid "Clock / hour"
+msgstr "Reloj / hora"
+
+msgid "Clock / minute"
+msgstr "Reloj / minuto"
+
+msgid "Commit"
+msgstr "Revisión"
+
+msgid "Ctrl Info"
+msgstr "Controlador"
+
+msgid "Current limits"
+msgstr "Límites de corriente"
+
+msgid "DISPLAY SETTING"
+msgstr "PANTALLA"
+
+msgid "Diagnostics"
+msgstr "Diagnóstico"
+
+msgid "Display Info"
+msgstr "Pantalla"
+
+msgid "Display Setting"
+msgstr "Pantalla"
+
+msgid "EDIT"
+msgstr "EDITAR"
+
+#. Native name of the selected language.
+msgid "English"
+msgstr "Español"
+
+msgid "ERROR "
+msgstr "ERROR "
+
+msgid "Error "
+msgstr "Error "
+
+msgid "Error code"
+msgstr "Registro de errores"
+
+msgid "Exit"
+msgstr "Salir"
+
+msgid "Factory Reset"
+msgstr "Restablecer ajustes"
+
+msgid "Home screen"
+msgstr "Pantalla principal"
+
+msgid "INFORMATION"
+msgstr "INFORMACIÓN"
+
+msgid "Information"
+msgstr "Información"
+
+msgid "Language"
+msgstr "Idioma"
+
+msgid "Last CAN  "
+msgstr "Último CAN  "
+
+msgid "Level 1"
+msgstr "Nivel 1"
+
+msgid "Level 2"
+msgstr "Nivel 2"
+
+msgid "Level 3"
+msgstr "Nivel 3"
+
+msgid "Level 4"
+msgstr "Nivel 4"
+
+msgid "Level 5"
+msgstr "Nivel 5"
+
+msgid "Level 6"
+msgstr "Nivel 6"
+
+msgid "Level 7"
+msgstr "Nivel 7"
+
+msgid "Level 8"
+msgstr "Nivel 8"
+
+msgid "Level 9"
+msgstr "Nivel 9"
+
+msgid "Light sensitivity"
+msgstr "Sensibilidad de luz"
+
+msgid "Loaded"
+msgstr "Leído"
+
+msgid "MOTOR SETTINGS"
+msgstr "AJUSTES DEL MOTOR"
+
+msgid "MOTOR"
+msgstr "MOTOR"
+
+msgid "Mismatch"
+msgstr "No coincide"
+
+msgid "Mode "
+msgstr "Modo "
+
+msgid "Modified"
+msgstr "Modificado"
+
+msgid "Motor Settings"
+msgstr "Ajustes del motor"
+
+msgid "No recorded errors"
+msgstr "Sin errores registrados"
+
+msgid "No reply"
+msgstr "Sin respuesta"
+
+msgid "No torque sensor data\nSerial / version  --"
+msgstr "Sin datos del sensor de par\nSerie / versión  --"
+
+msgid "No"
+msgstr "No"
+
+msgid "ODO"
+msgstr "TOTAL"
+
+msgid "Odometer"
+msgstr "Kilometraje total"
+
+msgid "Off"
+msgstr "Desactivado"
+
+msgid "On"
+msgstr "Activado"
+
+msgid "Power control error"
+msgstr "Error al apagar"
+
+msgid "Power mode"
+msgstr "Modo de potencia"
+
+msgid "Powering off"
+msgstr "Apagando"
+
+msgid "Queued"
+msgstr "En espera"
+
+msgid "RANGE"
+msgstr "AUTONOMÍA"
+
+msgid "RIDE STATISTICS"
+msgstr "DATOS DEL VIAJE"
+
+msgid "Read first"
+msgstr "Lea primero"
+
+msgid "Read only"
+msgstr "Solo lectura"
+
+msgid "Readback OK"
+msgstr "Lectura correcta"
+
+msgid "Reading"
+msgstr "Leyendo"
+
+msgid "SERVICE DUE"
+msgstr "MANTENIMIENTO PENDIENTE"
+
+msgid "SERVICE"
+msgstr "MANTENIMIENTO"
+
+msgid "SETTINGS"
+msgstr "AJUSTES"
+
+msgid "SPEED PER LEVEL"
+msgstr "VELOCIDAD POR NIVEL"
+
+msgid "START RESPONSE"
+msgstr "RESPUESTA DE ARRANQUE"
+
+msgid "Save error"
+msgstr "Error al guardar"
+
+msgid "Sent"
+msgstr "Enviado"
+
+msgid "Serial / version"
+msgstr "Serie / versión"
+
+msgid "Service interval"
+msgstr "Intervalo de revisión"
+
+msgid "Service reset"
+msgstr "Revisión realizada"
+
+msgid "Service"
+msgstr "Mantenimiento"
+
+msgid "Set assist 0"
+msgstr "Ponga asistencia a 0"
+
+msgid "Set values"
+msgstr "Introduzca valores"
+
+msgid "Settings save failed"
+msgstr "Fallo al guardar ajustes"
+
+msgid "Since service"
+msgstr "Desde revisión"
+
+msgid "Source "
+msgstr "Origen "
+
+msgid "Speed Limit"
+msgstr "Límite de velocidad"
+
+msgid "Speed limits"
+msgstr "Límites de velocidad"
+
+msgid "Standard"
+msgstr "Estándar"
+
+msgid "Start response"
+msgstr "Respuesta de arranque"
+
+msgid "TRIP Reset"
+msgstr "Reiniciar viaje"
+
+msgid "TRIP"
+msgstr "VIAJE"
+
+msgid "Torque Info"
+msgstr "Sensor de par"
+
+msgid "Total voltage"
+msgstr "Voltaje total"
+
+msgid "UART errors  "
+msgstr "Errores UART  "
+
+msgid "Unavailable"
+msgstr "No disponible"
+
+msgid "Unit"
+msgstr "Unidades"
+
+msgid "Unknown"
+msgstr "Desconocida"
+
+msgid "V"
+msgstr "V"
+
+msgid "Verified"
+msgstr "Verificado"
+
+msgid "Verifying"
+msgstr "Verificando"
+
+msgid "W"
+msgstr "W"
+
+msgid "Waiting for controller data"
+msgstr "Esperando al controlador"
+
+msgid "Wheel Length"
+msgstr "Circunferencia"
+
+msgid "Wheel Size"
+msgstr "Diámetro de rueda"
+
+msgid "Writing"
+msgstr "Escribiendo"
+
+msgid "Yes"
+msgstr "Sí"
+
+msgid "fresh"
+msgstr "actual"
+
+msgid "in"
+msgstr "pulg"
+
+msgid "km"
+msgstr "km"
+
+msgid "km/h"
+msgstr "km/h"
+
+msgid "mi"
+msgstr "mi"
+
+msgid "mm"
+msgstr "mm"
+
+msgid "mph"
+msgstr "mph"
+
+msgid "stale"
+msgstr "obsoleto"

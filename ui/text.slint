@@ -23,151 +23,150 @@ export global UiText {
     public pure function hex6(value: int) -> string {
         return root.hex2(floor(value / 65536)) + root.hex4(mod(value, 65536));
     }
-    public pure function distance-unit(russian: bool, imperial: bool) -> string {
-        return imperial ? (russian ? "ми" : "mi") : (russian ? "км" : "km");
+    public pure function distance-unit(imperial: bool) -> string {
+        return imperial ? @tr("mi") : @tr("km");
     }
-    public pure function speed-unit(russian: bool, imperial: bool) -> string {
-        return imperial ? (russian ? "миль/ч" : "mph") : (russian ? "км/ч" : "km/h");
+    public pure function speed-unit(imperial: bool) -> string {
+        return imperial ? @tr("mph") : @tr("km/h");
     }
-    public pure function caption(kind: StatisticKind, russian: bool) -> string {
-        if (kind == StatisticKind.trip) { return russian ? "ПУТЬ" : "TRIP"; }
-        if (kind == StatisticKind.range) { return russian ? "ЗАПАС ХОДА" : "RANGE"; }
-        if (kind == StatisticKind.cadence) { return russian ? "КАДЕНС" : "CADENCE"; }
-        if (kind == StatisticKind.battery) { return russian ? "БАТАРЕЯ" : "BATTERY"; }
-        if (kind == StatisticKind.motor) { return russian ? "МОТОР" : "MOTOR"; }
-        return russian ? "КОНТРОЛЛЕР" : "CONTROLLER";
+    public pure function caption(kind: StatisticKind) -> string {
+        if (kind == StatisticKind.trip) { return @tr("TRIP"); }
+        if (kind == StatisticKind.range) { return @tr("RANGE"); }
+        if (kind == StatisticKind.cadence) { return @tr("CADENCE"); }
+        if (kind == StatisticKind.battery) { return @tr("BATTERY"); }
+        if (kind == StatisticKind.motor) { return @tr("MOTOR"); }
+        return @tr("CONTROLLER");
     }
-    public pure function odometer-caption(russian: bool) -> string {
-        return russian ? "ПРОБЕГ" : "ODO";
+    public pure function odometer-caption() -> string {
+        return @tr("ODO");
     }
-    public pure function ride-title(russian: bool) -> string {
-        return russian ? "ПОЕЗДКА" : "RIDE STATISTICS";
+    public pure function ride-title() -> string {
+        return @tr("RIDE STATISTICS");
     }
 
-    public pure function value(data: DisplayValue, russian: bool, imperial: bool) -> string {
+    public pure function value(data: DisplayValue, imperial: bool) -> string {
         if (data.kind == ValueKind.empty) { return ""; }
         if (data.kind == ValueKind.navigation) { return ">"; }
         if (data.kind == ValueKind.unavailable) { return "--"; }
         if (data.kind == ValueKind.number) { return data.available ? "\{data.whole}" : "--"; }
         if (data.kind == ValueKind.distance-tenths || data.kind == ValueKind.distance-hundredths || data.kind == ValueKind.voltage || data.kind == ValueKind.metric-speed || data.kind == ValueKind.wheel) {
-            return root.decimal-value(data, russian, imperial);
+            return root.decimal-value(data, imperial);
         }
         if (data.kind == ValueKind.percent || data.kind == ValueKind.power || data.kind == ValueKind.millimetres || data.kind == ValueKind.kilometres || data.kind == ValueKind.cadence || data.kind == ValueKind.temperature || data.kind == ValueKind.start-response) {
-            return root.measurement-value(data, russian);
+            return root.measurement-value(data);
         }
-        return root.option-value(data, russian, imperial);
+        return root.option-value(data, imperial);
     }
-    pure function decimal-value(data: DisplayValue, russian: bool, imperial: bool) -> string {
+    pure function decimal-value(data: DisplayValue, imperial: bool) -> string {
         if (data.kind == ValueKind.voltage) {
-            return data.available ? "\{data.whole}.\{data.fraction} V" : "--.- V";
+            return (data.available ? "\{data.whole}.\{data.fraction}" : "--.-") + " " + @tr("V");
         }
         if (data.kind == ValueKind.metric-speed) {
-            return (data.available ? "\{data.whole}.\{data.fraction}" : "--") + " " + root.speed-unit(russian, false);
+            return (data.available ? "\{data.whole}.\{data.fraction}" : "--") + " " + root.speed-unit(false);
         }
         if (data.kind == ValueKind.wheel) {
-            return data.available ? "\{data.whole}.\{data.fraction} in" : "-- in";
+            return (data.available ? "\{data.whole}.\{data.fraction}" : "--") + " " + @tr("in");
         }
-        return "\{data.whole}." + (data.kind == ValueKind.distance-hundredths ? root.two(data.fraction) : "\{data.fraction}") + " " + root.distance-unit(russian, imperial);
+        return "\{data.whole}." + (data.kind == ValueKind.distance-hundredths ? root.two(data.fraction) : "\{data.fraction}") + " " + root.distance-unit(imperial);
     }
-    pure function measurement-value(data: DisplayValue, russian: bool) -> string {
+    pure function measurement-value(data: DisplayValue) -> string {
         if (data.kind == ValueKind.percent) { return data.available ? "\{data.whole}%" : "--%"; }
-        if (data.kind == ValueKind.power) { return (data.available ? "\{data.whole}" : "--") + (russian ? " Вт" : " W"); }
-        if (data.kind == ValueKind.millimetres) { return data.available ? "\{data.whole}" + (russian ? " мм" : " mm") : "-- mm"; }
-        if (data.kind == ValueKind.kilometres) { return "\{data.whole} " + root.distance-unit(russian, false); }
-        if (data.kind == ValueKind.cadence) { return (data.available ? "\{data.whole}" : "--") + (russian ? " об/мин" : " rpm"); }
-        if (data.kind == ValueKind.temperature) { return data.available ? "\{data.whole} C" : "-- C"; }
+        if (data.kind == ValueKind.power) { return (data.available ? "\{data.whole}" : "--") + @tr(" W"); }
+        if (data.kind == ValueKind.millimetres) { return (data.available ? "\{data.whole}" : "--") + " " + @tr("mm"); }
+        if (data.kind == ValueKind.kilometres) { return "\{data.whole} " + root.distance-unit(false); }
+        if (data.kind == ValueKind.cadence) { return (data.available ? "\{data.whole}" : "--") + @tr(" rpm"); }
+        if (data.kind == ValueKind.temperature) { return (data.available ? "\{data.whole}" : "--") + " C"; }
         return "\{data.whole} / 8";
     }
-    pure function option-value(data: DisplayValue, russian: bool, imperial: bool) -> string {
-        if (data.kind == ValueKind.toggle) { return data.flag ? (russian ? "Вкл" : "On") : (russian ? "Выкл" : "Off"); }
-        if (data.kind == ValueKind.confirmation) { return data.flag ? (russian ? "Да" : "Yes") : (russian ? "Нет" : "No"); }
-        if (data.kind == ValueKind.theme) { return data.flag ? (russian ? "Классическая" : "Classic") : (russian ? "Стандартная" : "Standard"); }
-        if (data.kind == ValueKind.language) { return data.flag ? "Русский" : "English"; }
-        if (data.kind == ValueKind.distance-unit) { return root.distance-unit(russian, imperial); }
+    pure function option-value(data: DisplayValue, imperial: bool) -> string {
+        if (data.kind == ValueKind.toggle) { return data.flag ? @tr("On") : @tr("Off"); }
+        if (data.kind == ValueKind.confirmation) { return data.flag ? @tr("Yes") : @tr("No"); }
+        if (data.kind == ValueKind.theme) { return data.flag ? @tr("Classic") : @tr("Standard"); }
+        if (data.kind == ValueKind.distance-unit) { return root.distance-unit(imperial); }
         if (data.kind == ValueKind.clock) { return data.available ? root.two(data.whole) + ":" + root.two(data.fraction) : "--:--"; }
-        if (data.kind == ValueKind.levels) { return "\{data.whole}" + (russian ? " уровней" : " levels"); }
-        if (data.kind == ValueKind.mode) { return (russian ? "Режим " : "Mode ") + "\{data.whole}"; }
-        return data.whole == 0 ? (russian ? "Выкл" : "Off") : "\{data.whole}" + (russian ? " мин" : " min");
+        if (data.kind == ValueKind.levels) { return "\{data.whole}" + @tr(" levels"); }
+        if (data.kind == ValueKind.mode) { return @tr("Mode ") + "\{data.whole}"; }
+        return data.whole == 0 ? @tr("Off") : "\{data.whole}" + @tr(" min");
     }
 
-    public pure function status(code: StatusCode, russian: bool) -> string {
+    public pure function status(code: StatusCode) -> string {
         if (code == StatusCode.none || code == StatusCode.page-position) { return ""; }
         if (code == StatusCode.apply || code == StatusCode.busy || code == StatusCode.offline || code == StatusCode.neutral || code == StatusCode.invalid || code == StatusCode.queued || code == StatusCode.sent || code == StatusCode.readback-ok) {
-            return root.request-status(code, russian);
+            return root.request-status(code);
         }
         if (code == StatusCode.reading || code == StatusCode.loaded || code == StatusCode.timeout || code == StatusCode.read-first || code == StatusCode.modified || code == StatusCode.writing || code == StatusCode.verifying || code == StatusCode.verified || code == StatusCode.bad-block || code == StatusCode.mismatch) {
-            return root.transfer-status(code, russian);
+            return root.transfer-status(code);
         }
-        return root.system-status(code, russian);
+        return root.system-status(code);
     }
-    pure function request-status(code: StatusCode, russian: bool) -> string {
-        if (code == StatusCode.apply) { return russian ? "Записать" : "Apply"; }
-        if (code == StatusCode.busy) { return russian ? "Занято" : "Busy"; }
-        if (code == StatusCode.offline) { return russian ? "Нет связи CAN" : "CAN offline"; }
-        if (code == StatusCode.neutral) { return russian ? "Нужен ассист 0" : "Set assist 0"; }
-        if (code == StatusCode.invalid) { return russian ? "Нет значений" : "Set values"; }
-        if (code == StatusCode.queued) { return russian ? "В очереди" : "Queued"; }
-        if (code == StatusCode.sent) { return russian ? "Отправлено" : "Sent"; }
-        return russian ? "Прочитано" : "Readback OK";
+    pure function request-status(code: StatusCode) -> string {
+        if (code == StatusCode.apply) { return @tr("Apply"); }
+        if (code == StatusCode.busy) { return @tr("Busy"); }
+        if (code == StatusCode.offline) { return @tr("CAN offline"); }
+        if (code == StatusCode.neutral) { return @tr("Set assist 0"); }
+        if (code == StatusCode.invalid) { return @tr("Set values"); }
+        if (code == StatusCode.queued) { return @tr("Queued"); }
+        if (code == StatusCode.sent) { return @tr("Sent"); }
+        return @tr("Readback OK");
     }
-    pure function transfer-status(code: StatusCode, russian: bool) -> string {
-        if (code == StatusCode.reading) { return russian ? "Чтение" : "Reading"; }
-        if (code == StatusCode.loaded) { return russian ? "Прочитано" : "Loaded"; }
-        if (code == StatusCode.timeout) { return russian ? "Нет ответа" : "No reply"; }
-        if (code == StatusCode.read-first) { return russian ? "Сначала чтение" : "Read first"; }
-        if (code == StatusCode.modified) { return russian ? "Изменено" : "Modified"; }
-        if (code == StatusCode.writing) { return russian ? "Запись" : "Writing"; }
-        if (code == StatusCode.verifying) { return russian ? "Проверка" : "Verifying"; }
-        if (code == StatusCode.verified) { return russian ? "Совпадает" : "Verified"; }
-        if (code == StatusCode.bad-block) { return russian ? "Неверный блок" : "Bad block"; }
-        return russian ? "Не совпадает" : "Mismatch";
+    pure function transfer-status(code: StatusCode) -> string {
+        if (code == StatusCode.reading) { return @tr("Reading"); }
+        if (code == StatusCode.loaded) { return @tr("Loaded"); }
+        if (code == StatusCode.timeout) { return @tr("No reply"); }
+        if (code == StatusCode.read-first) { return @tr("Read first"); }
+        if (code == StatusCode.modified) { return @tr("Modified"); }
+        if (code == StatusCode.writing) { return @tr("Writing"); }
+        if (code == StatusCode.verifying) { return @tr("Verifying"); }
+        if (code == StatusCode.verified) { return @tr("Verified"); }
+        if (code == StatusCode.bad-block) { return @tr("Bad block"); }
+        return @tr("Mismatch");
     }
-    pure function system-status(code: StatusCode, russian: bool) -> string {
-        if (code == StatusCode.save-error) { return russian ? "Ошибка" : "Save error"; }
-        if (code == StatusCode.edit) { return russian ? "ПРАВКА" : "EDIT"; }
-        if (code == StatusCode.powering-off) { return russian ? "Выключение" : "Powering off"; }
-        if (code == StatusCode.settings-save-failed) { return russian ? "Ошибка сохранения" : "Settings save failed"; }
-        if (code == StatusCode.power-control-error) { return russian ? "Ошибка выключения" : "Power control error"; }
-        return russian ? "ПОРА ПРОЙТИ ТО" : "SERVICE DUE";
+    pure function system-status(code: StatusCode) -> string {
+        if (code == StatusCode.save-error) { return @tr("Save error"); }
+        if (code == StatusCode.edit) { return @tr("EDIT"); }
+        if (code == StatusCode.powering-off) { return @tr("Powering off"); }
+        if (code == StatusCode.settings-save-failed) { return @tr("Settings save failed"); }
+        if (code == StatusCode.power-control-error) { return @tr("Power control error"); }
+        return @tr("SERVICE DUE");
     }
-    public pure function dashboard-error(fault: bool, code: int, service-due: bool, russian: bool) -> string {
-        if (fault) { return (russian ? "ОШИБКА " : "ERROR ") + root.hex2(code); }
-        return service-due ? root.status(StatusCode.service-due, russian) : "";
+    public pure function dashboard-error(fault: bool, code: int, service-due: bool) -> string {
+        if (fault) { return @tr("ERROR ") + root.hex2(code); }
+        return service-due ? root.status(StatusCode.service-due) : "";
     }
 
-    public pure function information(item: MenuItem, data: InformationData, russian: bool) -> string {
+    public pure function information(item: MenuItem, data: InformationData) -> string {
         if (item == MenuItem.battery-info) {
-            return (russian ? "Напряжение" : "Total voltage") + "  " + root.value(data.voltage, russian, false) + "\nSOC  " + root.value(data.battery, russian, false);
+            return @tr("Total voltage") + "  " + root.value(data.voltage, false) + "\nSOC  " + root.value(data.battery, false);
         }
-        if (item == MenuItem.ctrl-info) { return root.controller-information(data, russian); }
+        if (item == MenuItem.ctrl-info) { return root.controller-information(data); }
         if (item == MenuItem.display-info) {
             return "LCD  320x240\nFLASH  " + root.hex6(data.flash-jedec) + " / 8 MiB\nPSRAM  8 MiB\nMCU  [" + root.hex2(data.mcu0) + ", " + root.hex2(data.mcu1) + ", " + root.hex2(data.mcu2) + ", " + root.hex2(data.mcu3) + ", " + root.hex2(data.mcu4) + "]\n" + root.two(data.hour) + ":" + root.two(data.minute);
         }
         if (item == MenuItem.torque-info) {
-            return russian ? "Нет данных датчика момента\nСерийный номер / версия  --" : "No torque sensor data\nSerial / version  --";
+            return @tr("No torque sensor data\nSerial / version  --");
         }
-        if (item == MenuItem.errors) { return root.error-information(data, russian); }
-        return russian ? "Недоступно" : "Unavailable";
+        if (item == MenuItem.errors) { return root.error-information(data); }
+        return @tr("Unavailable");
     }
-    pure function controller-information(data: InformationData, russian: bool) -> string {
-        if (!data.controller-available) { return russian ? "Ожидание данных контроллера" : "Waiting for controller data"; }
-        return MenuText.label(MenuItem.limit, russian) + "  \{floor(data.limit / 100)}." + root.two(mod(data.limit, 100)) + " " + root.speed-unit(russian, false) + "\n" +
-            MenuText.label(MenuItem.wheel, russian) + "  \{floor(data.wheel / 10)}.\{mod(data.wheel, 10)} in\n" +
-            MenuText.label(MenuItem.circumference, russian) + "  \{data.circumference} mm\nCAN RX  " + root.counter(data.can-rx) + "\n" +
-            (russian ? "Серийный номер / версия" : "Serial / version") + "  --";
+    pure function controller-information(data: InformationData) -> string {
+        if (!data.controller-available) { return @tr("Waiting for controller data"); }
+        return MenuText.label(MenuItem.limit) + "  \{floor(data.limit / 100)}." + root.two(mod(data.limit, 100)) + " " + root.speed-unit(false) + "\n" +
+            MenuText.label(MenuItem.wheel) + "  \{floor(data.wheel / 10)}.\{mod(data.wheel, 10)} " + @tr("in") + "\n" +
+            MenuText.label(MenuItem.circumference) + "  \{data.circumference} " + @tr("mm") + "\nCAN RX  " + root.counter(data.can-rx) + "\n" +
+            @tr("Serial / version") + "  --";
     }
-    pure function error-information(data: InformationData, russian: bool) -> string {
-        if (data.error-count == 0) { return russian ? "Ошибок в журнале нет" : "No recorded errors"; }
-        return (russian ? "Ошибка " : "Error ") + root.hex2(data.error-code) + "\n" +
-            (russian ? "Источник " : "Source ") + "\{data.error-source} / cmd " + root.hex2(data.error-command) + ":\{data.error-subcommand}\n\{data.error-position} / \{data.error-count}";
+    pure function error-information(data: InformationData) -> string {
+        if (data.error-count == 0) { return @tr("No recorded errors"); }
+        return @tr("Error ") + root.hex2(data.error-code) + "\n" +
+            @tr("Source ") + "\{data.error-source} / cmd " + root.hex2(data.error-command) + ":\{data.error-subcommand}\n\{data.error-position} / \{data.error-count}";
     }
-    public pure function diagnostics(data: DiagnosticsData, russian: bool) -> string {
-        return "PSRAM  OK\nFLASH  " + (data.flash-writable ? "OK" : "READ") + " / " + root.hex6(data.flash-jedec) +
+    public pure function diagnostics(data: DiagnosticsData) -> string {
+        return "PSRAM  OK\nFLASH  " + (data.flash-writable ? "OK" : @tr("Read only")) + " / " + root.hex6(data.flash-jedec) +
             "\nCAN RX  " + root.counter(data.can-rx) + "  TX  " + root.counter(data.can-tx) +
             "\nMCU RX  " + root.counter(data.mcu-rx) + "\nADC  " + root.counter(data.adc-mv) + " mV / " +
-            (data.adc-fresh ? (russian ? "актуально" : "fresh") : (russian ? "устарело" : "stale")) + "\n" +
-            (russian ? "Ошибки UART  " : "UART errors  ") + root.counter(data.uart-errors) + "\n" +
-            (russian ? "Повреждено кадров  " : "Bad frames  ") + root.counter(data.bad-frames) + "\n" +
-            (russian ? "Последний CAN  " : "Last CAN  ") + root.hex4(data.last-can-high) + root.hex4(data.last-can-low);
+            (data.adc-fresh ? @tr("fresh") : @tr("stale")) + "\n" +
+            @tr("UART errors  ") + root.counter(data.uart-errors) + "\n" +
+            @tr("Bad frames  ") + root.counter(data.bad-frames) + "\n" +
+            @tr("Last CAN  ") + root.hex4(data.last-can-high) + root.hex4(data.last-can-low);
     }
 }

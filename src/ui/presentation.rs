@@ -206,7 +206,7 @@ impl Presenter<'_> {
                     self.model.minute as i32,
                 )
             },
-            Language => DisplayValue::option(ValueKind::Language, s.language != 0),
+            Language => DisplayValue::missing(ValueKind::Language),
             Levels => DisplayValue::number(ValueKind::Number, s.levels as i32),
             Limit => DisplayValue {
                 available: d.valid & 1 != 0,
@@ -464,7 +464,7 @@ impl UserInterface {
         };
         let c = &self.component;
         c.set_view(model.navigation.view.into());
-        c.set_russian(model.preferences.settings.language != 0);
+        self.set_language(model.preferences.settings.language);
         c.set_imperial(model.preferences.settings.imperial);
         c.set_theme(model.preferences.settings.theme as i32);
         c.set_status_error(model.save_error);
